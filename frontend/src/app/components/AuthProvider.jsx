@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+
+import Loader from "@/lib/Loader";
 import userStore from "@/store/userStore";
 
 const publicRoutes = ["/user-login", "/user-register", "/forgot-password"];
 
 export default function AuthProvider({ children }) {
-  const { getCurrentUser, isAuthenticated, loading } = userStore();
+  const { getCurrentUser, loading } = userStore();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const loginSuccess = searchParams.get("loginSuccess");
-  const tokenSet = searchParams.get("tokenSet");
   const [authChecked, setAuthChecked] = useState(false);
 
   // Only check auth once on initial load or when login parameters change
@@ -80,7 +81,11 @@ export default function AuthProvider({ children }) {
 
   // Show minimal loading indicator while checking auth
   if (loading && !authChecked) {
-    return <div className="hidden">Loading...</div>;
+    return (
+      <div>
+        <Loader />
+      </div>
+    );
   }
 
   return children;

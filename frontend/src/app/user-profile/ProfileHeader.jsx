@@ -14,7 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateUserCoverPhoto, updateUserProfile } from "@/service/user.service";
+import {
+  updateUserCoverPhoto,
+  updateUserProfile,
+} from "@/service/user.service";
 import userStore from "@/store/userStore";
 import { useForm } from "react-hook-form";
 
@@ -34,17 +37,16 @@ const ProfileHeader = ({
   const [loading, setLaoding] = useState(false);
   const { setUser } = userStore();
 
-   const {register,handleSubmit,setValue} = useForm({
-    defaultValues:{
+  const { register, handleSubmit, setValue } = useForm({
+    defaultValues: {
       username: profileData?.username,
       dateOfBirth: profileData?.dateOfBirth?.split("T")[0],
-      gender: profileData?.gender
-    }
-   })
+      gender: profileData?.gender,
+    },
+  });
 
   const profileImageInputRef = useRef();
   const coverImageInputRef = useRef();
-
 
   const onSubmitProfile = async (data) => {
     try {
@@ -90,7 +92,7 @@ const ProfileHeader = ({
         formData.append("coverPhoto", coverPhotoFile);
       }
       const updateProfile = await updateUserCoverPhoto(id, formData);
-      setProfileData({ ...profileData, coverPhoto:updateProfile.coverPhoto });
+      setProfileData({ ...profileData, coverPhoto: updateProfile.coverPhoto });
       setIsEditCoverModel(false);
       setCoverPhotoFile(null);
     } catch (error) {
@@ -136,7 +138,7 @@ const ProfileHeader = ({
           <Avatar className="w-32 h-32 border-4 border-white dark:border-gray-700">
             <AvatarImage
               src={profileData?.profilePicture}
-              alt={profileData.username}
+              alt={profileData?.username}
             />
             <AvatarFallback className="dark:bg-gray-400">
               {profileData?.username
@@ -190,7 +192,10 @@ const ProfileHeader = ({
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              <form className="space-y-4" onSubmit={handleSubmit(onSubmitProfile)}>
+              <form
+                className="space-y-4"
+                onSubmit={handleSubmit(onSubmitProfile)}
+              >
                 <div className="flex flex-col items-center mb-4">
                   <Avatar className="w-24 h-24 border-4 border-white dark:border-gray-700 mb-2">
                     <AvatarImage
@@ -204,24 +209,42 @@ const ProfileHeader = ({
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
-                  <input type="file" accept="image/*" className="hidden" ref={profileImageInputRef}  onChange={handleProfilePictureChange}/>
-                  <Button type="button" variant="outline" size="sm" onClick={() => profileImageInputRef.current?.click()}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={profileImageInputRef}
+                    onChange={handleProfilePictureChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => profileImageInputRef.current?.click()}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
                     Change Profile Picture
                   </Button>
                 </div>
                 <div>
                   <Label htmlFor="username">Username</Label>
-                  <Input id="username"  {...register("username")}/>
+                  <Input id="username" {...register("username")} />
                 </div>
                 <div>
                   <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                  <Input id="dateOfBirth" type="date"  {...register("dateOfBirth")}/>
+                  <Input
+                    id="dateOfBirth"
+                    type="date"
+                    {...register("dateOfBirth")}
+                  />
                 </div>
 
                 <div>
                   <Label htmlFor="gender">Gender</Label>
-                  <Select onValueChange={(value) => setValue("gender", value)} defaultValue={profileData?.gender}>
+                  <Select
+                    onValueChange={(value) => setValue("gender", value)}
+                    defaultValue={profileData?.gender}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -236,7 +259,8 @@ const ProfileHeader = ({
                   type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-400 text-white"
                 >
-                  <Save className="w-4 h-4 mr-2" /> {loading ? "Saving...": "Save changes"}
+                  <Save className="w-4 h-4 mr-2" />{" "}
+                  {loading ? "Saving..." : "Save changes"}
                 </Button>
               </form>
             </motion.div>
@@ -280,8 +304,19 @@ const ProfileHeader = ({
                       className="w-full h-40 object-cover rounded-lg mb-4"
                     />
                   )}
-                  <input type="file" accept="image/*" className="hidden" ref={coverImageInputRef}  onChange={handleCoverPhotoChange}/>
-                  <Button type="button" variant="outline" size="sm" onClick={() => coverImageInputRef.current?.click()}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    ref={coverImageInputRef}
+                    onChange={handleCoverPhotoChange}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => coverImageInputRef.current?.click()}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
                     Select New Cover Photo
                   </Button>
@@ -290,10 +325,11 @@ const ProfileHeader = ({
                 <Button
                   className="w-full bg-blue-600 hover:bg-blue-400 text-white"
                   onClick={onSubmitCoverPhoto}
-                  disabled = {!coverPhotoFile}
+                  disabled={!coverPhotoFile}
                   type="button"
                 >
-                  <Save className="w-4 h-4 mr-2" /> {loading ? "Saving..." :"Save Cover Photo"}
+                  <Save className="w-4 h-4 mr-2" />{" "}
+                  {loading ? "Saving..." : "Save Cover Photo"}
                 </Button>
               </form>
             </motion.div>

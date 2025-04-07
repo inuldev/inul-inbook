@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
+import Loader from "@/lib/Loader";
 import { fetchUserProfile } from "@/service/user.service";
 
 import ProfileTabs from "../ProfileTabs";
@@ -34,8 +35,12 @@ const Page = () => {
     }
   }, [id]);
 
-  if (!profileData) {
-    return <div>Loading...</div>;
+  if (!profileData && loading) {
+    return (
+      <div>
+        <Loader />
+      </div>
+    );
   }
 
   return (
