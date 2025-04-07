@@ -21,13 +21,28 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const LeftSideBar = () => {
   const router = useRouter();
-  const { user, clearUser } = userStore();
+  const { user, logout } = userStore();
   const { isSidebarOpen, toggleSidebar } = useSidebarStore();
 
   const handleNavigation = (path) => {
     router.push(path);
     if (isSidebarOpen) {
       toggleSidebar();
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push("/user-login", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Manually clear the cookies if the server request fails
+      document.cookie =
+        "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie =
+        "auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      router.push("/user-login", { replace: true });
     }
   };
 
@@ -46,10 +61,12 @@ const LeftSideBar = () => {
             onClick={() => handleNavigation("/")}
           >
             <Avatar className="h-10 w-10">
-              <AvatarImage />
-              <AvatarFallback className="dark:bg-gray-400">ID</AvatarFallback>
+              <AvatarImage src={user?.profilePicture} />
+              <AvatarFallback className="dark:bg-gray-400">
+                {user?.username?.charAt(0) || "U"}
+              </AvatarFallback>
             </Avatar>
-            <span className="font-semibold">Inul Dev</span>
+            <span className="font-semibold">{user?.username || "User"}</span>
           </div>
           <Button
             variant="ghost"
@@ -98,13 +115,19 @@ const LeftSideBar = () => {
           <Separator className="my-4" />
           <div className="flex items-center space-x-2 mb-4 cursor-pointer">
             <Avatar className="h-10 w-10">
-              <AvatarImage />
-              <AvatarFallback className="dark:bg-gray-400">ID</AvatarFallback>
+              <AvatarImage src={user?.profilePicture} />
+              <AvatarFallback className="dark:bg-gray-400">
+                {user?.username?.charAt(0) || "U"}
+              </AvatarFallback>
             </Avatar>
-            <span className="font-semibold">Inul Dev</span>
+            <span className="font-semibold">{user?.username || "User"}</span>
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
-            <Button variant="ghost" className="cursor-pointer -ml-4">
+            <Button
+              variant="ghost"
+              className="cursor-pointer -ml-4"
+              onClick={handleLogout}
+            >
               <LogOut />
               <span className="ml-2 font-bold text-md">Logout</span>
             </Button>

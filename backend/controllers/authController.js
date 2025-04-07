@@ -15,16 +15,20 @@ const generateToken = (id) => {
 const sendTokenResponse = (user, statusCode, res) => {
   const token = generateToken(user._id);
 
+  // Set more permissive cookie options to ensure it works across environments
   const options = {
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     httpOnly: true,
     secure: config.isProduction,
     sameSite: config.isProduction ? "none" : "lax", // Needed for cross-site cookies in production
     path: "/", // Ensure consistent path for all cookies
+    domain: undefined, // Let the browser set the domain automatically
   };
 
   console.log("Setting auth cookie with options:", options);
+  console.log("Token being set:", token.substring(0, 10) + "...");
 
+  // Set the cookie and return the response
   res
     .status(statusCode)
     .cookie("token", token, options)
@@ -193,19 +197,33 @@ const handleGoogleCallback = (req, res) => {
     // Generate JWT token
     const token = generateToken(req.user._id);
 
-    // Set JWT token in HTTP-only cookie
+    // Use the same cookie options as in sendTokenResponse
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       httpOnly: true,
       secure: config.isProduction,
       sameSite: config.isProduction ? "none" : "lax",
       path: "/",
+      domain: undefined, // Let the browser set the domain automatically
     };
 
+    console.log("Setting Google OAuth cookie with options:", cookieOptions);
+    console.log("Token being set:", token.substring(0, 10) + "...");
+
+    // Set the cookie
     res.cookie("token", token, cookieOptions);
 
-    // Redirect to frontend with success
-    res.redirect(`${config.frontendUrl}?loginSuccess=true`);
+    // Also set a non-httpOnly cookie for client-side detection
+    res.cookie("auth_status", "logged_in", {
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      httpOnly: false,
+      secure: config.isProduction,
+      sameSite: config.isProduction ? "none" : "lax",
+      path: "/",
+    });
+
+    // Redirect to frontend with success and token in query param for debugging
+    res.redirect(`${config.frontendUrl}?loginSuccess=true&tokenSet=true`);
   } catch (error) {
     console.error("Google callback error:", error);
     res.redirect(`${config.frontendUrl}/user-login?error=Server error`);

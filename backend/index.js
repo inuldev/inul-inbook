@@ -21,10 +21,19 @@ app.use(
     origin: config.frontendUrl,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cache-Control",
+      "Pragma",
+      "Expires",
+    ],
     exposedHeaders: ["Set-Cookie"],
   })
 );
+
+// Enable pre-flight requests for all routes
+app.options("*", cors());
 
 // Log all requests for debugging
 app.use((req, res, next) => {

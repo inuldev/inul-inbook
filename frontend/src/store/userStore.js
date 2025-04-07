@@ -33,7 +33,16 @@ const userStore = create((set) => ({
 
       if (!hasToken) {
         console.warn("No token cookie found after successful login");
+        // If cookie wasn't set, try to set it manually
+        document.cookie = `token=${data.token}; path=/; max-age=${
+          60 * 60 * 24 * 30
+        }`;
       }
+
+      // Also set a non-httpOnly cookie for client-side detection
+      document.cookie = `auth_status=logged_in; path=/; max-age=${
+        60 * 60 * 24 * 30
+      }`;
 
       set({
         user: data.user, // Updated to match the response structure from backend
@@ -56,26 +65,43 @@ const userStore = create((set) => ({
   },
 
   getCurrentUser: async () => {
+    // If we're already authenticated and have user data, don't fetch again
+    const state = userStore.getState();
+    if (state.isAuthenticated && state.user && !state.loading) {
+      console.log("Already authenticated with user data, skipping fetch");
+      return state.user;
+    }
+
     set({ loading: true, error: null });
     try {
       // Check if token exists in cookies
       const cookies = document.cookie;
-      console.log("Current cookies:", cookies);
+      console.log("Current cookies in getCurrentUser:", cookies);
 
       const hasToken = cookies.includes("token=");
-      if (!hasToken) {
-        console.log("No token found in cookies");
+      const hasAuthStatus = cookies.includes("auth_status=");
+
+      if (!hasToken && !hasAuthStatus) {
+        console.log("No authentication tokens found in cookies");
         throw new Error("No authentication token found");
       }
 
-      const response = await fetch(`${config.backendUrl}/api/auth/me`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: config.apiTimeouts.medium,
-      });
+      // Add a timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(
+        `${config.backendUrl}/api/auth/me?_=${timestamp}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+          timeout: config.apiTimeouts.medium,
+        }
+      );
 
       console.log("Auth response status:", response.status);
       const data = await response.json();
@@ -121,9 +147,12 @@ const userStore = create((set) => ({
         throw new Error("Logout failed");
       }
 
-      // Clear the token cookie
+      // Clear both cookies
       document.cookie =
         "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      document.cookie =
+        "auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      console.log("Cleared auth cookies");
 
       set({
         user: null,

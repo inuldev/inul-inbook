@@ -6,9 +6,14 @@ const protect = async (req, res, next) => {
   try {
     let token;
 
+    // Log all cookies for debugging
+    console.log("All cookies in auth middleware:", req.cookies);
+    console.log("Authorization header:", req.headers.authorization);
+
     // Check if token exists in cookies
     if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
+      console.log("Token found in cookies:", token.substring(0, 10) + "...");
     }
     // Check if token exists in headers
     else if (
@@ -16,6 +21,10 @@ const protect = async (req, res, next) => {
       req.headers.authorization.startsWith("Bearer")
     ) {
       token = req.headers.authorization.split(" ")[1];
+      console.log(
+        "Token found in authorization header:",
+        token.substring(0, 10) + "..."
+      );
     }
 
     if (!token) {
