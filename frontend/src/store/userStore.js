@@ -170,6 +170,54 @@ const userStore = create((set) => ({
     }
   },
 
+  register: async (userData) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`${config.backendUrl}/api/auth/register`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+        timeout: config.apiTimeouts.medium,
+      });
+
+      const data = await response.json();
+      console.log("Register response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      // Set auth cookies
+      document.cookie = `token=${data.token}; path=/; max-age=${
+        60 * 60 * 24 * 30
+      }`;
+      document.cookie = `auth_status=logged_in; path=/; max-age=${
+        60 * 60 * 24 * 30
+      }`;
+
+      set({
+        user: data.user,
+        isAuthenticated: true,
+        loading: false,
+        error: null,
+      });
+
+      return data;
+    } catch (error) {
+      console.error("Registration error:", error);
+      set({
+        user: null,
+        isAuthenticated: false,
+        loading: false,
+        error: error.message,
+      });
+      throw error;
+    }
+  },
+
   clearErrors: () => set({ error: null }),
 }));
 
