@@ -12,11 +12,13 @@ import {
   getFriendRequests,
   getFriendSuggestions,
 } from "@/service/friends.service";
+import useFriendNotificationStore from "@/store/friendNotificationStore";
 
 export default function FriendsListPage() {
   const [loading, setLoading] = useState(true);
   const [friendRequests, setFriendRequests] = useState([]);
   const [friendSuggestions, setFriendSuggestions] = useState([]);
+  const { resetCount } = useFriendNotificationStore();
 
   const loadData = async () => {
     setLoading(true);
@@ -39,7 +41,9 @@ export default function FriendsListPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // Reset the notification count when the page is visited
+    resetCount();
+  }, [resetCount]);
 
   return (
     <>

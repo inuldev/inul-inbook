@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Home,
@@ -14,6 +14,7 @@ import {
 
 import userStore from "@/store/userStore";
 import useSidebarStore from "@/store/sidebarStore";
+import useFriendNotificationStore from "@/store/friendNotificationStore";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -23,6 +24,20 @@ const LeftSideBar = () => {
   const router = useRouter();
   const { user, logout } = userStore();
   const { isSidebarOpen, toggleSidebar } = useSidebarStore();
+  const { pendingRequestsCount, fetchPendingRequestsCount } =
+    useFriendNotificationStore();
+
+  useEffect(() => {
+    // Fetch pending friend requests count when component mounts
+    fetchPendingRequestsCount();
+
+    // Set up an interval to periodically check for new friend requests
+    const intervalId = setInterval(() => {
+      fetchPendingRequestsCount();
+    }, 60000); // Check every minute
+
+    return () => clearInterval(intervalId);
+  }, [fetchPendingRequestsCount]);
 
   const handleNavigation = (path) => {
     router.push(path);
@@ -78,11 +93,16 @@ const LeftSideBar = () => {
           </Button>
           <Button
             variant="ghost"
-            className="full justify-start"
+            className="full justify-start relative"
             onClick={() => handleNavigation("/friends-list", "friends")}
           >
             <Users className="mr-4" />
             Friends List
+            {pendingRequestsCount > 0 && (
+              <span className="absolute top-0 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {pendingRequestsCount}
+              </span>
+            )}
           </Button>
           <Button
             variant="ghost"

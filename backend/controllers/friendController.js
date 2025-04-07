@@ -1,7 +1,7 @@
 const User = require("../model/User");
 const FriendRequest = require("../model/FriendRequest");
 
-// @desc    Get friend suggestions (all users except current user and friends)
+// @desc    Get friend suggestions (all users except current user, friends, and pending requests)
 // @route   GET /api/friends/suggestions
 // @access  Private
 const getFriendSuggestions = async (req, res) => {
@@ -15,12 +15,34 @@ const getFriendSuggestions = async (req, res) => {
       });
     }
 
-    // Get all users except current user and those already in following/followers lists
+    // Find all pending friend requests involving the current user
+    const pendingRequests = await FriendRequest.find({
+      $or: [
+        { sender: currentUser._id, status: "pending" },
+        { recipient: currentUser._id, status: "pending" },
+      ],
+    });
+
+    // Extract user IDs from pending requests
+    const pendingUserIds = pendingRequests.reduce((ids, request) => {
+      // If current user is the sender, add recipient to excluded list
+      if (request.sender.toString() === currentUser._id.toString()) {
+        ids.push(request.recipient);
+      }
+      // If current user is the recipient, add sender to excluded list
+      if (request.recipient.toString() === currentUser._id.toString()) {
+        ids.push(request.sender);
+      }
+      return ids;
+    }, []);
+
+    // Get all users except current user, those in following/followers lists, and those with pending requests
     const suggestions = await User.find({
       $and: [
         { _id: { $ne: currentUser._id } },
         { _id: { $nin: currentUser.following } },
         { _id: { $nin: currentUser.followers } },
+        { _id: { $nin: pendingUserIds } },
       ],
     }).select("username email profilePicture");
 
@@ -206,13 +228,13 @@ const declineFriendRequest = async (req, res) => {
       });
     }
 
-    // Update the friend request status
-    friendRequest.status = "declined";
-    await friendRequest.save();
+    // Instead of just updating the status, we'll delete the request
+    // This will allow the user to reappear in friend suggestions
+    await FriendRequest.findByIdAndDelete(id);
 
     res.status(200).json({
       success: true,
-      data: friendRequest,
+      message: "Friend request declined and removed",
     });
   } catch (error) {
     console.error("Error declining friend request:", error);

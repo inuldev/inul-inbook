@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -19,6 +19,7 @@ import {
 
 import userStore from "@/store/userStore";
 import useSidebarStore from "@/store/sidebarStore";
+import useFriendNotificationStore from "@/store/friendNotificationStore";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,13 @@ const Header = () => {
   const [activeTab, setActiveTab] = useState("home");
   const { theme, setTheme } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { pendingRequestsCount, fetchPendingRequestsCount } =
+    useFriendNotificationStore();
+
+  useEffect(() => {
+    // Fetch pending friend requests count when component mounts
+    fetchPendingRequestsCount();
+  }, [fetchPendingRequestsCount]);
 
   const handleNavigation = (path, item) => {
     router.push(path);
@@ -111,8 +119,13 @@ const Header = () => {
           {[
             { icon: Home, path: "/", name: "home" },
             { icon: Video, path: "/video-feed", name: "video" },
-            { icon: Users, path: "/friends-list", name: "friends" },
-          ].map(({ icon: Icon, path, name }) => (
+            {
+              icon: Users,
+              path: "/friends-list",
+              name: "friends",
+              notification: pendingRequestsCount > 0,
+            },
+          ].map(({ icon: Icon, path, name, notification }) => (
             <Button
               key={name}
               variant="ghost"
@@ -122,7 +135,14 @@ const Header = () => {
               }`}
               onClick={() => handleNavigation(path, name)}
             >
-              <Icon />
+              <div className="relative">
+                <Icon />
+                {notification && (
+                  <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-xs font-bold rounded-full h-4 w-4 flex items-center justify-center text-center">
+                    {pendingRequestsCount}
+                  </span>
+                )}
+              </div>
             </Button>
           ))}
         </nav>
