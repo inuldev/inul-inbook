@@ -1,3 +1,4 @@
+import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "next-themes";
 import localFont from "next/font/local";
 
@@ -27,6 +28,34 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Toaster
+          toastOptions={{
+            // Default styles
+            style: {
+              borderRadius: "8px",
+              background: "#333",
+              color: "#fff",
+            },
+            // Default duration
+            duration: 3000,
+            // Success toast style
+            success: {
+              duration: 3000,
+              style: {
+                background: "green",
+                color: "white",
+              },
+            },
+            // Error toast style
+            error: {
+              duration: 4000,
+              style: {
+                background: "#FF4B4B",
+                color: "white",
+              },
+            },
+          }}
+        />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <ConditionalHeader />

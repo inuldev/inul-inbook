@@ -10,6 +10,7 @@ const {
   getUserFollowers,
   getUserFollowing,
   searchUsers,
+  getMutualFriends,
 } = require("../controllers/userController");
 const { protect } = require("../middleware/auth");
 const { profileUpload } = require("../middleware/upload");
@@ -20,6 +21,7 @@ const router = express.Router();
 router.get("/search", searchUsers);
 router.get("/followers/:id", getUserFollowers);
 router.get("/following/:id", getUserFollowing);
+router.get("/mutual-friends/:id", protect, getMutualFriends);
 router.get("/:id", getUserProfile);
 
 // Protected routes

@@ -1,5 +1,6 @@
 const User = require("../model/User");
 const Bio = require("../model/Bio");
+const mongoose = require("mongoose");
 
 // @desc    Get user profile
 // @route   GET /api/users/:id
@@ -73,7 +74,8 @@ const updateProfile = async (req, res) => {
 // @access  Private
 const updateBio = async (req, res) => {
   try {
-    const { about, work, education, location, relationship, website, phone } = req.body;
+    const { about, work, education, location, relationship, website, phone } =
+      req.body;
 
     // Find bio
     let bio = await Bio.findOne({ user: req.user.id });
@@ -411,6 +413,56 @@ const searchUsers = async (req, res) => {
   }
 };
 
+// @desc    Get mutual friends between current user and another user
+// @route   GET /api/users/mutual-friends/:id
+// @access  Private
+const getMutualFriends = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const targetUser = await User.findById(req.params.id);
+
+    if (!currentUser || !targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // If the user is viewing their own profile, return their following list
+    if (currentUser._id.toString() === targetUser._id.toString()) {
+      const following = await User.find({
+        _id: { $in: currentUser.following },
+      }).select("username email profilePicture followerCount");
+
+      return res.status(200).json({
+        success: true,
+        data: following,
+      });
+    }
+
+    // Find mutual friends (users that both the current user and target user follow)
+    const mutualFriends = await User.find({
+      _id: {
+        $in: currentUser.following.filter((id) =>
+          targetUser.following.includes(id)
+        ),
+      },
+    }).select("username email profilePicture followerCount");
+
+    res.status(200).json({
+      success: true,
+      data: mutualFriends,
+    });
+  } catch (error) {
+    console.error("Error getting mutual friends:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getUserProfile,
   updateProfile,
@@ -422,4 +474,5 @@ module.exports = {
   getUserFollowers,
   getUserFollowing,
   searchUsers,
+  getMutualFriends,
 };

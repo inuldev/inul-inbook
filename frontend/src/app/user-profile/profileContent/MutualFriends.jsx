@@ -53,7 +53,7 @@ const MutualFriends = ({ id, isOwner }) => {
                       />
                     ) : (
                       <AvatarFallback className="dark:bg-gray-400">
-                        {userPlaceholder}
+                        {friend?.username?.charAt(0) || "U"}
                       </AvatarFallback>
                     )}
                   </Avatar>
