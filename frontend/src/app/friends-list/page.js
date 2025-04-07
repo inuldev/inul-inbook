@@ -1,38 +1,43 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 import { FriendCardSkeleton, NoFriendsMessage } from "@/lib/Skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import FriendRequest from "./FriendRequest";
 import FriendsSuggestion from "./FriendsSuggestion";
-import userStore from "@/store/userStore";
+
+import {
+  getFriendRequests,
+  getFriendSuggestions,
+} from "@/service/friends.service";
 
 export default function FriendsListPage() {
-  const { user } = userStore();
   const [loading, setLoading] = useState(true);
   const [friendRequests, setFriendRequests] = useState([]);
   const [friendSuggestions, setFriendSuggestions] = useState([]);
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Fetch friend requests and suggestions
+      const [requestsData, suggestionsData] = await Promise.all([
+        getFriendRequests(),
+        getFriendSuggestions(),
+      ]);
+
+      setFriendRequests(requestsData);
+      setFriendSuggestions(suggestionsData);
+    } catch (error) {
+      console.error("Error loading friend data:", error);
+      toast.error("Failed to load friend data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Simulate loading data
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        // In a real implementation, you would fetch data from your API
-        // For now, we'll just simulate a delay and use empty data
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Sample data - replace with actual API calls in the future
-        setFriendRequests([{}]);
-        setFriendSuggestions([{}]);
-      } catch (error) {
-        console.error("Error loading friend data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
 
@@ -54,7 +59,11 @@ export default function FriendsListPage() {
           </Card>
         ) : (
           friendRequests.map((friend) => (
-            <FriendRequest key={friend._id || "temp"} friend={friend} />
+            <FriendRequest
+              key={friend._id || "temp"}
+              friend={friend}
+              onRequestProcessed={loadData}
+            />
           ))
         )}
       </div>
@@ -75,7 +84,11 @@ export default function FriendsListPage() {
           </Card>
         ) : (
           friendSuggestions.map((friend) => (
-            <FriendsSuggestion key={friend._id || "temp"} friend={friend} />
+            <FriendsSuggestion
+              key={friend._id || "temp"}
+              friend={friend}
+              onRequestSent={loadData}
+            />
           ))
         )}
       </div>
