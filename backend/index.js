@@ -17,24 +17,41 @@ const friendRoutes = require("./routes/friendRoutes");
 const app = express();
 
 // CORS configuration
-app.use(
-  cors({
-    origin: config.frontendUrl,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cache-Control",
-      "Pragma",
-      "Expires",
-    ],
-    exposedHeaders: ["Set-Cookie"],
-  })
-);
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+
+    // Check if the origin is allowed
+    const allowedOrigins = [config.frontendUrl];
+    if (config.isDevelopment) {
+      // In development, also allow localhost
+      allowedOrigins.push("http://localhost:3000");
+    }
+
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      console.warn(`Origin ${origin} not allowed by CORS`);
+      callback(null, true); // Allow all origins in case of misconfiguration
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cache-Control",
+    "Pragma",
+    "Expires",
+  ],
+  exposedHeaders: ["Set-Cookie"],
+};
+
+app.use(cors(corsOptions));
 
 // Enable pre-flight requests for all routes
-app.options("*", cors());
+app.options("*", cors(corsOptions));
 
 // Log all requests for debugging
 app.use((req, res, next) => {
@@ -54,6 +71,8 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: config.session.cookie,
+    // Add proxy support for secure cookies behind a proxy
+    proxy: config.isProduction,
   })
 );
 

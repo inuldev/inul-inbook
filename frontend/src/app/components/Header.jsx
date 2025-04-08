@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { useTheme } from "next-themes";
-import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
   Home,
@@ -20,6 +20,7 @@ import {
 import userStore from "@/store/userStore";
 import useSidebarStore from "@/store/sidebarStore";
 import useFriendNotificationStore from "@/store/friendNotificationStore";
+import { searchUsers } from "@/service/user.service";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,9 +36,12 @@ import {
 
 const Header = () => {
   const router = useRouter();
-  const { user, logout, isAuthenticated, loading } = userStore();
+  const { user, logout } = userStore();
   const { toggleSidebar } = useSidebarStore();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState("home");
   const { theme, setTheme } = useTheme();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -45,9 +49,55 @@ const Header = () => {
     useFriendNotificationStore();
 
   useEffect(() => {
-    // Fetch pending friend requests count when component mounts
     fetchPendingRequestsCount();
   }, [fetchPendingRequestsCount]);
+
+  // Handle search input change
+  const handleSearchChange = async (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.trim().length >= 2) {
+      setIsSearching(true);
+      setIsSearchOpen(true);
+
+      try {
+        const results = await searchUsers(query);
+        setSearchResults(results);
+      } catch (error) {
+        console.error("Error searching users:", error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setIsSearchOpen(false);
+      setSearchResults([]);
+    }
+  };
+
+  // Handle clicking on a search result
+  const handleSearchResultClick = (userId) => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    router.push(`/user-profile/${userId}`);
+  };
+
+  // Close search results when clicking outside
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleNavigation = (path, item) => {
     router.push(path);
@@ -60,16 +110,15 @@ const Header = () => {
     try {
       await logout();
       console.log("Logout successful");
-      // Use router.push with replace option
-      await router.push("/user-login", { replace: true });
+      router.push("/user-login", { replace: true });
     } catch (error) {
       console.error("Logout failed:", error);
-      // Manually clear the cookie if the server request fails
+      // Manually clear the cookies if the server request fails
       document.cookie =
         "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       console.log("Manually cleared token cookie");
       // Force logout even if it fails
-      await router.push("/user-login", { replace: true });
+      router.push("/user-login", { replace: true });
     } finally {
       setIsLoggingOut(false);
     }
@@ -87,28 +136,49 @@ const Header = () => {
             onClick={() => handleNavigation("/")}
             className="cursor-pointer"
           />
-          <div className="relative">
-            <form>
+          <div className="relative" ref={searchRef}>
+            <form onSubmit={(e) => e.preventDefault()}>
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   className="pl-8 w-40 md:w-64 h-10 bg-gray-100 dark:bg-[rgb(58,59,60)] rounded-full"
-                  placeholder="search..."
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
                 />
               </div>
               {isSearchOpen && (
-                <div className="absolute top-full left-0 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg mt-1 z-50">
+                <div className="absolute top-full left-0 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg mt-1 z-50 max-h-[300px] overflow-y-auto">
                   <div className="p-2">
-                    <div className="flex items-center space-x-8 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer">
-                      <Search className="absolute text-sm text-gray-400" />
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage />
-                          <AvatarFallback>ID</AvatarFallback>
-                        </Avatar>
-                        <span>Inul Dev</span>
+                    {isSearching ? (
+                      <div className="flex justify-center items-center p-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                       </div>
-                    </div>
+                    ) : searchResults.length > 0 ? (
+                      searchResults.map((result) => (
+                        <div
+                          key={result._id}
+                          className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+                          onClick={() => handleSearchResultClick(result._id)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={result.profilePicture} />
+                              <AvatarFallback className="dark:bg-gray-600">
+                                {result.username?.charAt(0) || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">
+                              {result.username}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    ) : searchQuery.trim().length >= 2 ? (
+                      <div className="p-3 text-center text-gray-500 dark:text-gray-400">
+                        No users found
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}

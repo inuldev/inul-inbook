@@ -201,10 +201,10 @@ const handleGoogleCallback = (req, res) => {
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       httpOnly: true,
-      secure: config.isProduction,
+      secure: config.isProduction || config.frontendUrl.startsWith("https"),
       sameSite: config.isProduction ? "none" : "lax",
       path: "/",
-      domain: undefined, // Let the browser set the domain automatically
+      // Don't set domain to allow the browser to use the current domain
     };
 
     console.log("Setting Google OAuth cookie with options:", cookieOptions);
@@ -217,7 +217,7 @@ const handleGoogleCallback = (req, res) => {
     res.cookie("auth_status", "logged_in", {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       httpOnly: false,
-      secure: config.isProduction,
+      secure: config.isProduction || config.frontendUrl.startsWith("https"),
       sameSite: config.isProduction ? "none" : "lax",
       path: "/",
     });

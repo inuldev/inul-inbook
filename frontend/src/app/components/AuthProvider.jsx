@@ -38,6 +38,9 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       // Special handling for Google OAuth callback
       if (loginSuccess === "true") {
         console.log("Google login detected, checking auth status");
+        console.log("Token cookie present:", hasToken);
+        console.log("Auth status cookie present:", hasAuthStatus);
+        console.log("All cookies:", document.cookie);
 
         // If we have tokens, try to fetch user data
         if (hasToken || hasAuthStatus) {
@@ -51,6 +54,33 @@ function AuthProviderCore({ searchParams, pathname, children }) {
           }
         } else {
           console.error("Google login success but no auth tokens found");
+
+          // Try to set a fallback cookie and retry
+          if (typeof document !== "undefined") {
+            console.log("Setting fallback auth_status cookie");
+            document.cookie =
+              "auth_status=logged_in; path=/; max-age=2592000; SameSite=Lax" +
+              (window.location.protocol === "https:" ? "; Secure" : "");
+
+            // Check if cookie was set
+            const cookieSet = document.cookie.includes("auth_status=");
+            console.log("Fallback cookie set success:", cookieSet);
+
+            if (cookieSet) {
+              // Try to fetch user data again
+              try {
+                await getCurrentUser();
+                setAuthChecked(true);
+                return;
+              } catch (secondError) {
+                console.error(
+                  "Error fetching user after setting fallback cookie:",
+                  secondError
+                );
+              }
+            }
+          }
+
           // This is a special case where the redirect worked but cookies weren't set
           // We'll mark auth as checked but not authenticated
           userStore.setState({
