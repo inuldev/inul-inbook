@@ -6,8 +6,6 @@ import { useSearchParams } from "next/navigation";
 // This component safely accesses search params inside a Suspense boundary
 function SearchParamsReader({ children }) {
   const searchParams = useSearchParams();
-  
-  // Pass the searchParams to the children function
   return children(searchParams);
 }
 

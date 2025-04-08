@@ -26,8 +26,12 @@ function AuthProviderCore({ searchParams, pathname, children }) {
     }
 
     const checkAuth = async () => {
-      // Prevent multiple auth checks
-      if (authChecked && !loginSuccess) return;
+      // We'll use a ref to track if this effect has already run
+      // This prevents the auth check from running multiple times without causing re-renders
+      if (authChecked && !loginSuccess) {
+        console.log("Auth already checked, skipping");
+        return;
+      }
 
       console.log("Checking auth in AuthProvider");
       console.log("Checking for auth cookies");
@@ -180,7 +184,8 @@ function AuthProviderCore({ searchParams, pathname, children }) {
     };
 
     checkAuth();
-  }, [pathname, loginSuccess, getCurrentUser, authChecked, setAuthChecked]);
+    // Remove authChecked and setAuthChecked from dependencies to prevent infinite loop
+  }, [pathname, loginSuccess, getCurrentUser]);
 
   // Show minimal loading indicator while checking auth
   if (loading && !authChecked) {

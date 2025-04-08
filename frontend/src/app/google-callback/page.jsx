@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
 import userStore from "@/store/userStore";
-import Loader from "@/lib/Loader";
-import { hasCookie } from "@/lib/cookieUtils";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { logAuthDebugInfo, storeAuthError } from "@/lib/authDebug";
 
@@ -17,7 +16,16 @@ export default function GoogleCallbackPage() {
   // Get the Google auth hook
   const { handleGoogleCallback } = useGoogleAuth();
 
+  // Use a ref to track if the callback has been processed
+  const callbackProcessed = useRef(false);
+
   useEffect(() => {
+    // Only process the callback once
+    if (callbackProcessed.current) {
+      return;
+    }
+    callbackProcessed.current = true;
+
     console.log("Google callback page loaded");
 
     // Log detailed debug information
@@ -69,7 +77,9 @@ export default function GoogleCallbackPage() {
     };
 
     processCallback();
-  }, [searchParams, getCurrentUser, router, handleGoogleCallback]);
+    // Remove dependencies that might cause re-renders and infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">

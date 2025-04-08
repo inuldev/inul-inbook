@@ -5,7 +5,8 @@ import localFont from "next/font/local";
 import "./globals.css";
 import AuthProvider from "./components/AuthProvider";
 import ConditionalHeader from "./components/ConditionalHeader";
-import { DebugButton } from "@/lib/debugUtils";
+
+import { DebugButton } from "@/components/DebugButton";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
