@@ -85,10 +85,7 @@ const getFeedStories = async (req, res) => {
     // Get stories from followed users and own stories that haven't expired
     const stories = await Story.find({
       expiresAt: { $gt: new Date() },
-      $or: [
-        { user: { $in: user.following } },
-        { user: req.user.id },
-      ],
+      $or: [{ user: { $in: user.following } }, { user: req.user.id }],
     })
       .sort({ createdAt: -1 })
       .populate({
@@ -266,8 +263,63 @@ const getUserStories = async (req, res) => {
   }
 };
 
+// @desc    Create a story with direct upload URL
+// @route   POST /api/stories/direct
+// @access  Private
+const createStoryWithDirectUpload = async (req, res) => {
+  try {
+    const { caption, mediaUrl, mediaType } = req.body;
+
+    // Check if media URL is provided
+    if (!mediaUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Media URL is required for a story",
+      });
+    }
+
+    // Check if media type is provided
+    if (!mediaType || !["image", "video"].includes(mediaType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid media type (image or video) is required",
+      });
+    }
+
+    // Create story object
+    const storyData = {
+      user: req.user.id,
+      mediaUrl,
+      mediaType,
+      caption: caption || "",
+    };
+
+    // Create story
+    const story = await Story.create(storyData);
+
+    // Populate user data
+    const populatedStory = await Story.findById(story._id).populate({
+      path: "user",
+      select: "username profilePicture",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: populatedStory,
+    });
+  } catch (error) {
+    console.error("Error creating story with direct upload:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createStory,
+  createStoryWithDirectUpload,
   getStories,
   getFeedStories,
   getStory,

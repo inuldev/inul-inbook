@@ -74,11 +74,11 @@ export default function FriendsListPage() {
 
       <h1 className="text-2xl font-bold mb-6">People You May Know</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {loading ? (
           <FriendCardSkeleton />
         ) : friendSuggestions.length === 0 ? (
-          <Card className="col-span-2">
+          <Card className="col-span-3">
             <CardContent className="p-6">
               <NoFriendsMessage
                 text="No Friend Suggestions"

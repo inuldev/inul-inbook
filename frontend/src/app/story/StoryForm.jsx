@@ -18,11 +18,12 @@ import {
 import userStore from "@/store/userStore";
 import useStoryStore from "@/store/storyStore";
 import CloudinaryUploader from "../components/CloudinaryUploader";
+import config from "@/lib/config";
 
 const StoryForm = () => {
   const { user } = userStore();
   const { createStory, loading, error } = useStoryStore();
-  
+
   const [isOpen, setIsOpen] = useState(false);
   const [caption, setCaption] = useState("");
   const [mediaData, setMediaData] = useState(null);
@@ -46,13 +47,29 @@ const StoryForm = () => {
 
     try {
       setStoryError(null);
-      
-      // Create story with already uploaded media
-      await createStory({
-        caption,
-        mediaUrl: mediaData.url,
-        mediaType: mediaData.type,
-      });
+
+      // Create story with already uploaded media URL
+      await fetch(`${config.backendUrl}/api/stories/direct`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          caption,
+          mediaUrl: mediaData.url,
+          mediaType: mediaData.type,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (!data.success) {
+            throw new Error(data.message || "Failed to create story");
+          }
+
+          // Update stories in store
+          useStoryStore.getState().addStory(data.data);
+        });
 
       // Reset form
       setCaption("");
@@ -60,6 +77,7 @@ const StoryForm = () => {
       setShowMediaUploader(true);
       setIsOpen(false);
     } catch (error) {
+      console.error("Error creating story:", error);
       setStoryError(error.message);
     }
   };
@@ -95,7 +113,7 @@ const StoryForm = () => {
         <DialogHeader>
           <DialogTitle className="text-center">Create Story</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4 mt-4">
           {storyError && (
             <div className="text-red-500 flex items-center space-x-2">
@@ -103,7 +121,7 @@ const StoryForm = () => {
               <span>{storyError}</span>
             </div>
           )}
-          
+
           {showMediaUploader && !mediaData && (
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
@@ -117,7 +135,7 @@ const StoryForm = () => {
               />
             </div>
           )}
-          
+
           {mediaData && (
             <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
               {mediaData.type === "image" ? (
@@ -143,19 +161,19 @@ const StoryForm = () => {
               </Button>
             </div>
           )}
-          
+
           <Textarea
             placeholder="Add a caption to your story..."
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             className="resize-none"
           />
-          
+
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleCreateStory}
               disabled={loading || !mediaData}
             >

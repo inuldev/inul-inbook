@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   createStory,
+  createStoryWithDirectUpload,
   getStories,
   getFeedStories,
   getStory,
@@ -20,6 +21,7 @@ router.get("/:id", getStory);
 
 // Protected routes
 router.post("/", protect, storyUpload.single("media"), createStory);
+router.post("/direct", protect, createStoryWithDirectUpload);
 router.post("/upload-signature", protect, (req, res) => {
   try {
     const { publicId } = req.body;

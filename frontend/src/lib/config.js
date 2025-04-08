@@ -6,6 +6,16 @@ const config = {
     long: 30000,
     upload: 60000,
   },
+  mediaLimits: {
+    post: {
+      image: 10 * 1024 * 1024, // 10MB in bytes
+      video: 100 * 1024 * 1024, // 100MB in bytes
+    },
+    story: {
+      image: 5 * 1024 * 1024, // 5MB in bytes
+      video: 5 * 1024 * 1024, // 5MB in bytes
+    },
+  },
   isDevelopment: process.env.NODE_ENV === "development",
 };
 

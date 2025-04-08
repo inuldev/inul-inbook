@@ -244,6 +244,12 @@ const useStoryStore = create((set) => ({
     }
   },
 
+  // Add a story to the store
+  addStory: (story) =>
+    set((state) => ({
+      stories: [story, ...state.stories],
+    })),
+
   // Clear stories
   clearStories: () => {
     set({
