@@ -35,14 +35,31 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       const hasAuthStatus = document.cookie.includes("auth_status=");
 
       // Special handling for Google OAuth callback
-      if (loginSuccess === "true" && (hasToken || hasAuthStatus)) {
-        console.log("Google login detected, fetching user data");
-        try {
-          await getCurrentUser();
+      if (loginSuccess === "true") {
+        console.log("Google login detected, checking auth status");
+
+        // If we have tokens, try to fetch user data
+        if (hasToken || hasAuthStatus) {
+          console.log("Auth tokens found, fetching user data");
+          try {
+            await getCurrentUser();
+            setAuthChecked(true);
+            return;
+          } catch (error) {
+            console.error("Error fetching user after Google login:", error);
+          }
+        } else {
+          console.error("Google login success but no auth tokens found");
+          // This is a special case where the redirect worked but cookies weren't set
+          // We'll mark auth as checked but not authenticated
+          userStore.setState({
+            isAuthenticated: false,
+            user: null,
+            loading: false,
+            error: "Google login failed: Authentication tokens not received",
+          });
           setAuthChecked(true);
           return;
-        } catch (error) {
-          console.error("Error fetching user after Google login:", error);
         }
       }
 

@@ -72,15 +72,31 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    // Save current URL to session storage for potential redirect after login
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem("loginRedirectUrl", window.location.pathname);
-    }
+    try {
+      // Save current URL to session storage for potential redirect after login
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("loginRedirectUrl", window.location.pathname);
+      }
 
-    // Use window.location for OAuth redirect as router.push won't work for external URLs
-    const googleAuthUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
-    console.log("Redirecting to Google OAuth:", googleAuthUrl);
-    window.location.href = googleAuthUrl;
+      // Use window.location for OAuth redirect as router.push won't work for external URLs
+      const googleAuthUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
+      console.log("Redirecting to Google OAuth:", googleAuthUrl);
+
+      // Clear any existing errors before redirecting
+      clearErrors();
+
+      // Set loading state to prevent multiple clicks
+      setRedirecting(true);
+
+      // Redirect to Google OAuth
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      console.error("Error redirecting to Google OAuth:", error);
+      setFormError(
+        "Failed to connect to authentication service. Please try again."
+      );
+      setRedirecting(false);
+    }
   };
 
   return (

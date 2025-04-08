@@ -49,7 +49,23 @@ const nextConfig = {
   // Vercel-specific optimizations
   output: "standalone", // Optimize for Vercel deployment
   compress: true, // Enable compression
-  // Configure redirects for SPA behavior
+  // Configure redirects and rewrites for SPA behavior
+  async redirects() {
+    return [
+      // Handle 404 for forgot-password with RSC query param
+      {
+        source: "/forgot-password",
+        has: [
+          {
+            type: "query",
+            key: "_rsc",
+          },
+        ],
+        permanent: false,
+        destination: "/user-login",
+      },
+    ];
+  },
   async rewrites() {
     return [
       // Proxy API requests to the backend in development
