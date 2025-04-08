@@ -1,5 +1,9 @@
 const config = {
-  backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000",
+  // Use relative URL in production for same-domain API requests
+  backendUrl:
+    process.env.NODE_ENV === "production"
+      ? "" // Empty string means use relative URLs (same domain)
+      : process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000",
   apiTimeouts: {
     short: 5000,
     medium: 10000,
