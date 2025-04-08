@@ -12,6 +12,14 @@
     {
       "source": "/api/:path*",
       "destination": "https://inul-inbook-backend.vercel.app/api/:path*"
+    },
+    {
+      "source": "/api/auth/google",
+      "destination": "https://inul-inbook-backend.vercel.app/api/auth/google"
+    },
+    {
+      "source": "/api/auth/google/callback",
+      "destination": "https://inul-inbook-backend.vercel.app/api/auth/google/callback"
     }
   ],
   "headers": [

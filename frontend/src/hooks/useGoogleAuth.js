@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { setCookie } from "@/lib/cookieUtils";
+import { debugLog, logAuth, logAuthState } from "@/lib/debugUtils";
+import userStore from "@/store/userStore";
 
 /**
  * Custom hook for handling Google OAuth authentication
@@ -24,6 +26,10 @@ export function useGoogleAuth() {
         clearErrors();
       }
 
+      // Log current auth state before starting OAuth flow
+      logAuth("Starting Google OAuth flow");
+      logAuthState();
+
       // Save current URL to session storage for potential redirect after login
       if (typeof window !== "undefined") {
         // Store the current path for redirect after login
@@ -33,21 +39,63 @@ export function useGoogleAuth() {
         const frontendUrl = window.location.origin;
         sessionStorage.setItem("frontendUrl", frontendUrl);
 
-        // Store timestamp for debugging
-        sessionStorage.setItem("googleAuthTimestamp", Date.now().toString());
+        // Store detailed debug info
+        const debugInfo = {
+          timestamp: Date.now(),
+          userAgent: navigator.userAgent,
+          url: window.location.href,
+          referrer: document.referrer,
+          cookies: document.cookie ? "present" : "none",
+          localStorage: localStorage.length > 0 ? "present" : "none",
+          origin: window.location.origin,
+          hostname: window.location.hostname,
+          protocol: window.location.protocol,
+        };
+
+        sessionStorage.setItem("googleAuthDebug", JSON.stringify(debugInfo));
+        debugLog("oauth", "Stored debug info in sessionStorage", debugInfo);
       }
 
       // Use window.location for OAuth redirect as router.push won't work for external URLs
-      const googleAuthUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
-      console.log("Redirecting to Google OAuth:", googleAuthUrl);
+      // With same-domain setup, we can use a relative URL
+      let googleAuthUrl;
 
-      // Redirect to Google OAuth
-      window.location.href = googleAuthUrl;
+      if (process.env.NODE_ENV === "production") {
+        // In production, use a direct URL to the Google OAuth endpoint
+        googleAuthUrl = "/api/auth/google"; // Relative URL for same-domain setup
+      } else {
+        // In development, use the full backend URL
+        const backendUrl =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        googleAuthUrl = `${backendUrl}/api/auth/google`;
+      }
 
-      // Note: The function doesn't return after this point in most cases
-      // as the browser is redirected
+      debugLog("oauth", `Redirecting to Google OAuth: ${googleAuthUrl}`, {
+        environment: process.env.NODE_ENV,
+        backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL || "(empty)",
+        frontendUrl: process.env.NEXT_PUBLIC_FRONTEND_URL || "(empty)",
+      });
+
+      // Add a small delay to ensure logs are captured before redirect
+      setTimeout(() => {
+        // Try to open in same window
+        window.location.href = googleAuthUrl;
+
+        // Fallback: try to open in a new window if redirect doesn't work
+        setTimeout(() => {
+          debugLog("oauth", "Trying fallback: window.open");
+          window.open(googleAuthUrl, "_self");
+        }, 1000);
+      }, 100);
+
+      return true;
     } catch (error) {
       console.error("Error initiating Google login:", error);
+      logAuth("Google OAuth error", {
+        error: error.message,
+        stack: error.stack,
+      });
+
       setError(
         "Failed to connect to authentication service. Please try again."
       );
@@ -70,15 +118,42 @@ export function useGoogleAuth() {
     onError
   ) => {
     try {
-      console.log("Processing Google OAuth callback");
-      console.log("Search params:", Object.fromEntries(searchParams.entries()));
+      debugLog("oauth", "Processing Google OAuth callback");
+      logAuthState();
+
+      // Get debug info from session storage
+      let debugInfo = null;
+      try {
+        const debugInfoStr = sessionStorage.getItem("googleAuthDebug");
+        if (debugInfoStr) {
+          debugInfo = JSON.parse(debugInfoStr);
+          debugLog(
+            "oauth",
+            "Retrieved debug info from sessionStorage",
+            debugInfo
+          );
+        }
+      } catch (e) {
+        debugLog("oauth", "Error retrieving debug info", e);
+      }
+
+      // Log search params
+      const searchParamsObj = Object.fromEntries(searchParams.entries());
+      debugLog("oauth", "Search params:", searchParamsObj);
 
       // Check if we have the loginSuccess parameter
       const loginSuccess = searchParams.get("loginSuccess");
       const tokenSet = searchParams.get("tokenSet");
+      const provider = searchParams.get("provider");
+
+      debugLog("oauth", "Auth parameters", {
+        loginSuccess,
+        tokenSet,
+        provider,
+      });
 
       // Log all cookies for debugging
-      console.log("Cookies present:", document.cookie);
+      debugLog("oauth", "Cookies present:", document.cookie);
       const allCookies = document.cookie.split("; ").reduce((obj, cookie) => {
         if (cookie) {
           const [name, value] = cookie.split("=");
@@ -86,22 +161,46 @@ export function useGoogleAuth() {
         }
         return obj;
       }, {});
-      console.log("Parsed cookies:", allCookies);
+      debugLog("oauth", "Parsed cookies:", allCookies);
 
-      if (loginSuccess === "true") {
-        console.log("Login success detected");
+      // Log localStorage
+      const localStorageItems = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        localStorageItems[key] = localStorage.getItem(key);
+      }
+      debugLog("oauth", "LocalStorage items:", localStorageItems);
+
+      if (loginSuccess === "true" || provider === "google") {
+        debugLog("oauth", "Login success detected");
 
         // Check if we have auth cookies
         const hasTokenCookie = document.cookie.includes("token=");
         const hasAuthStatusCookie = document.cookie.includes("auth_status=");
 
-        console.log("Token cookie present:", hasTokenCookie);
-        console.log("Auth status cookie present:", hasAuthStatusCookie);
+        debugLog("oauth", "Cookie status", {
+          hasTokenCookie,
+          hasAuthStatusCookie,
+        });
 
         // Check if we have a token in the URL - this is our primary method in production
         const tokenParam = searchParams.get("token");
-        if (tokenParam && tokenSet === "true") {
-          console.log("Token found in URL, setting cookies manually");
+        const userId = searchParams.get("userId");
+        const username = searchParams.get("username");
+        const email = searchParams.get("email");
+        const profilePicture = searchParams.get("profilePicture");
+
+        debugLog("oauth", "URL parameters", {
+          hasToken: !!tokenParam,
+          hasUserId: !!userId,
+          tokenLength: tokenParam ? tokenParam.length : 0,
+        });
+
+        if (tokenParam) {
+          debugLog(
+            "oauth",
+            "Token found in URL, setting cookies and localStorage"
+          );
 
           // Set cookies manually with different options for different environments
           const isSecure = window.location.protocol === "https:";
@@ -109,12 +208,12 @@ export function useGoogleAuth() {
             process.env.NODE_ENV === "production" ||
             window.location.hostname !== "localhost";
 
-          console.log(
-            "Setting cookies with secure:",
+          debugLog("oauth", "Cookie settings", {
             isSecure,
-            "isProduction:",
-            isProduction
-          );
+            isProduction,
+            protocol: window.location.protocol,
+            hostname: window.location.hostname,
+          });
 
           // Set the token cookie
           setCookie("token", tokenParam, {
@@ -140,28 +239,56 @@ export function useGoogleAuth() {
             document.cookie = `auth_status=logged_in; path=/; max-age=${
               60 * 60 * 24 * 30
             }${isSecure ? "; Secure" : ""}; SameSite=Lax`;
-            console.log("Fallback cookies set directly");
+            debugLog("oauth", "Fallback cookies set directly");
           } catch (cookieError) {
-            console.error("Error setting fallback cookies:", cookieError);
+            debugLog("oauth", "Error setting fallback cookies", cookieError);
           }
 
-          // Verify cookies were set
+          // Store in localStorage as another fallback
+          try {
+            localStorage.setItem("auth_token", tokenParam);
+
+            // Store user data if available
+            if (userId) {
+              const userData = {
+                _id: userId,
+                username: username || "",
+                email: email || "",
+                profilePicture: profilePicture || "",
+              };
+              localStorage.setItem("auth_user", JSON.stringify(userData));
+              debugLog("oauth", "User data stored in localStorage", userData);
+            }
+
+            debugLog("oauth", "Auth data stored in localStorage");
+          } catch (storageError) {
+            debugLog("oauth", "Error storing in localStorage", storageError);
+          }
+
+          // Verify cookies and localStorage were set
           setTimeout(() => {
-            console.log("Cookies after setting:", document.cookie);
-            console.log(
-              "Token cookie present:",
-              document.cookie.includes("token=")
-            );
-            console.log(
-              "Auth status cookie present:",
-              document.cookie.includes("auth_status=")
-            );
+            const cookiesAfter = document.cookie;
+            const hasTokenAfter = cookiesAfter.includes("token=");
+            const hasAuthStatusAfter = cookiesAfter.includes("auth_status=");
+            const hasLocalStorageToken = !!localStorage.getItem("auth_token");
+            const hasLocalStorageUser = !!localStorage.getItem("auth_user");
+
+            debugLog("oauth", "Auth storage verification", {
+              cookiesPresent: cookiesAfter ? "yes" : "no",
+              hasTokenCookie: hasTokenAfter,
+              hasAuthStatusCookie: hasAuthStatusAfter,
+              hasLocalStorageToken,
+              hasLocalStorageUser,
+            });
           }, 100);
         }
 
         // If token cookie is missing but auth was successful, set a fallback cookie
-        if (!hasAuthStatusCookie && tokenSet === "true") {
-          console.log("Setting fallback auth_status cookie");
+        if (
+          !hasAuthStatusCookie &&
+          (tokenSet === "true" || provider === "google")
+        ) {
+          debugLog("oauth", "Setting fallback auth_status cookie");
           setCookie("auth_status", "logged_in", {
             maxAge: 60 * 60 * 24 * 30, // 30 days
             secure: window.location.protocol === "https:",
@@ -171,15 +298,57 @@ export function useGoogleAuth() {
 
         // Try to get the current user
         try {
+          // Check if we have auth in localStorage as a fallback
+          const localStorageToken = localStorage.getItem("auth_token");
+          const localStorageUser = localStorage.getItem("auth_user");
+
+          if (localStorageToken && localStorageUser) {
+            debugLog("oauth", "Using localStorage auth data");
+            // We can use the localStorage data to set the user directly
+            try {
+              const userData = JSON.parse(localStorageUser);
+              debugLog("oauth", "User data from localStorage", userData);
+
+              // Update the user store directly
+              if (userData && userData._id) {
+                debugLog("oauth", "Setting user data from localStorage");
+                userStore.setState({
+                  user: userData,
+                  isAuthenticated: true,
+                  loading: false,
+                  error: null,
+                  tokenFromUrl: localStorageToken,
+                });
+
+                if (typeof onSuccess === "function") {
+                  onSuccess();
+                }
+                return true;
+              }
+            } catch (parseError) {
+              debugLog(
+                "oauth",
+                "Error parsing user data from localStorage",
+                parseError
+              );
+            }
+          }
+
+          // Try to get the current user from the API
+          debugLog("oauth", "Fetching user data from API");
           await getCurrentUser();
-          console.log("User data fetched successfully");
+          debugLog("oauth", "User data fetched successfully from API");
 
           if (typeof onSuccess === "function") {
             onSuccess();
           }
           return true;
         } catch (error) {
-          console.error("Error fetching user after Google login:", error);
+          debugLog("oauth", "Error fetching user after Google login", {
+            error: error.message,
+            stack: error.stack,
+          });
+
           if (typeof onError === "function") {
             onError("Failed to fetch user data. Please try again.");
           }
@@ -192,14 +361,22 @@ export function useGoogleAuth() {
           ? `Authentication error: ${errorMsg}`
           : "Authentication failed: Invalid response";
 
-        console.error(errorMessage);
+        debugLog("oauth", "Authentication error", {
+          errorMsg,
+          searchParams: searchParamsObj,
+        });
+
         if (typeof onError === "function") {
           onError(errorMessage);
         }
         return false;
       }
     } catch (error) {
-      console.error("Error handling Google callback:", error);
+      debugLog("oauth", "Error handling Google callback", {
+        error: error.message,
+        stack: error.stack,
+      });
+
       if (typeof onError === "function") {
         onError("An unexpected error occurred. Please try again.");
       }

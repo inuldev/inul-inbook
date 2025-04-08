@@ -18,8 +18,10 @@ if (
         callbackURL: config.google.callbackUrl,
         // Additional options based on environment
         proxy: config.isProduction, // Handle proxy in production
+        // Allow relative callback URLs
+        passReqToCallback: true,
       },
-      async (accessToken, refreshToken, profile, done) => {
+      async (req, accessToken, refreshToken, profile, done) => {
         try {
           // Check if user already exists
           let user = await User.findOne({ email: profile.emails[0].value });
