@@ -6,6 +6,7 @@ const {
   getFeedPosts,
   getPost,
   updatePost,
+  updatePostWithDirectUpload,
   deletePost,
   likePost,
   unlikePost,
@@ -57,6 +58,7 @@ router.post("/upload-signature", protect, (req, res) => {
 });
 router.get("/feed/timeline", protect, getFeedPosts);
 router.put("/:id", protect, updatePost);
+router.put("/:id/direct", protect, updatePostWithDirectUpload);
 router.delete("/:id", protect, deletePost);
 router.put("/:id/like", protect, likePost);
 router.put("/:id/unlike", protect, unlikePost);

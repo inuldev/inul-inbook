@@ -301,6 +301,41 @@ const usePostStore = create((set) => ({
     }
   },
 
+  // Update a post
+  updatePost: async (postId, postData) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`${config.backendUrl}/api/posts/${postId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(postData),
+        timeout: config.apiTimeouts.medium,
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message);
+      }
+
+      // Update the post in the store
+      set((state) => ({
+        posts: state.posts.map((post) =>
+          post._id === postId ? data.data : post
+        ),
+        loading: false,
+      }));
+
+      return data.data;
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
   // Delete a post
   deletePost: async (postId) => {
     try {
@@ -363,6 +398,14 @@ const usePostStore = create((set) => ({
   addPost: (post) =>
     set((state) => ({
       posts: [post, ...state.posts],
+    })),
+
+  // Update a post in the store
+  updatePostInStore: (updatedPost) =>
+    set((state) => ({
+      posts: state.posts.map((post) =>
+        post._id === updatedPost._id ? updatedPost : post
+      ),
     })),
 
   // Clear posts

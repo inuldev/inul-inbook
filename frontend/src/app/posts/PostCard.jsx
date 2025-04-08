@@ -12,6 +12,8 @@ import {
   Edit,
 } from "lucide-react";
 
+import EditPostForm from "./EditPostForm";
+
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +42,7 @@ const PostCard = ({ post }) => {
   const { likePost, unlikePost, deletePost } = usePostStore();
   const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likeCount || 0);
   const [commentCount, setCommentCount] = useState(post?.commentCount || 0);
@@ -162,7 +165,10 @@ const PostCard = ({ post }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="cursor-pointer">
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => setIsEditFormOpen(true)}
+                  >
                     <Edit className="mr-2 h-4 w-4" /> Edit Post
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -297,6 +303,15 @@ const PostCard = ({ post }) => {
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {/* Edit Post Form */}
+      {isEditFormOpen && (
+        <EditPostForm
+          isOpen={isEditFormOpen}
+          onClose={() => setIsEditFormOpen(false)}
+          post={post}
+        />
+      )}
     </motion.div>
   );
 };

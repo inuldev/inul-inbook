@@ -1,6 +1,34 @@
 const Post = require("../model/Post");
 const Comment = require("../model/Comment");
 const User = require("../model/User");
+const { cloudinary } = require("../middleware/upload");
+
+// Helper function to extract public ID from Cloudinary URL
+const extractPublicIdFromUrl = (url) => {
+  try {
+    if (!url) return null;
+
+    // Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/social-media-app/posts/post_1234567890.jpg
+    // or https://res.cloudinary.com/cloud-name/video/upload/v1234567890/social-media-app/posts/post_1234567890.mp4
+
+    // Extract the path after /upload/
+    const uploadIndex = url.indexOf("/upload/");
+    if (uploadIndex === -1) return null;
+
+    const pathAfterUpload = url.substring(uploadIndex + 8);
+
+    // Remove version number if present (v1234567890/)
+    const versionRemoved = pathAfterUpload.replace(/^v\d+\//, "");
+
+    // Remove file extension
+    const publicId = versionRemoved.replace(/\.[^/.]+$/, "");
+
+    return publicId;
+  } catch (error) {
+    console.error("Error extracting public ID:", error);
+    return null;
+  }
+};
 
 // @desc    Create a post
 // @route   POST /api/posts
@@ -197,7 +225,7 @@ const getPost = async (req, res) => {
 // @access  Private
 const updatePost = async (req, res) => {
   try {
-    const { content, privacy } = req.body;
+    const { content, privacy, mediaUrl, mediaType } = req.body;
 
     // Find post
     let post = await Post.findById(req.params.id);
@@ -217,9 +245,33 @@ const updatePost = async (req, res) => {
       });
     }
 
-    // Update post
-    if (content) post.content = content;
-    if (privacy) post.privacy = privacy;
+    // Handle media changes
+    if (mediaUrl && mediaUrl !== post.mediaUrl) {
+      // If there was previous media, delete it from Cloudinary
+      if (post.mediaUrl) {
+        try {
+          const oldPublicId = extractPublicIdFromUrl(post.mediaUrl);
+          if (oldPublicId) {
+            await cloudinary.uploader.destroy(oldPublicId);
+            console.log(`Deleted old media from Cloudinary: ${oldPublicId}`);
+          }
+        } catch (cloudinaryError) {
+          console.error(
+            "Error deleting old media from Cloudinary:",
+            cloudinaryError
+          );
+          // Continue with update even if Cloudinary deletion fails
+        }
+      }
+
+      // Update with new media
+      post.mediaUrl = mediaUrl;
+      post.mediaType = mediaType || "image";
+    }
+
+    // Update other fields
+    if (content !== undefined) post.content = content;
+    if (privacy !== undefined) post.privacy = privacy;
 
     // Save post
     await post.save();
@@ -264,6 +316,20 @@ const deletePost = async (req, res) => {
         success: false,
         message: "Not authorized to delete this post",
       });
+    }
+
+    // Delete media from Cloudinary if it exists
+    if (post.mediaUrl) {
+      try {
+        const publicId = extractPublicIdFromUrl(post.mediaUrl);
+        if (publicId) {
+          await cloudinary.uploader.destroy(publicId);
+          console.log(`Deleted media from Cloudinary: ${publicId}`);
+        }
+      } catch (cloudinaryError) {
+        console.error("Error deleting media from Cloudinary:", cloudinaryError);
+        // Continue with post deletion even if Cloudinary deletion fails
+      }
     }
 
     // Delete all comments associated with the post
@@ -810,6 +876,82 @@ const createPostWithDirectUpload = async (req, res) => {
   }
 };
 
+// @desc    Update a post with direct upload URL
+// @route   PUT /api/posts/:id/direct
+// @access  Private
+const updatePostWithDirectUpload = async (req, res) => {
+  try {
+    const { content, privacy, mediaUrl, mediaType } = req.body;
+
+    // Find post
+    let post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    // Check if user is the owner
+    if (post.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this post",
+      });
+    }
+
+    // Handle media changes
+    if (mediaUrl && mediaUrl !== post.mediaUrl) {
+      // If there was previous media, delete it from Cloudinary
+      if (post.mediaUrl) {
+        try {
+          const oldPublicId = extractPublicIdFromUrl(post.mediaUrl);
+          if (oldPublicId) {
+            await cloudinary.uploader.destroy(oldPublicId);
+            console.log(`Deleted old media from Cloudinary: ${oldPublicId}`);
+          }
+        } catch (cloudinaryError) {
+          console.error(
+            "Error deleting old media from Cloudinary:",
+            cloudinaryError
+          );
+          // Continue with update even if Cloudinary deletion fails
+        }
+      }
+
+      // Update with new media
+      post.mediaUrl = mediaUrl;
+      post.mediaType = mediaType || "image";
+    }
+
+    // Update other fields
+    if (content !== undefined) post.content = content;
+    if (privacy !== undefined) post.privacy = privacy;
+
+    // Save post
+    await post.save();
+
+    // Populate user data
+    post = await Post.findById(post._id).populate({
+      path: "user",
+      select: "username profilePicture",
+    });
+
+    res.status(200).json({
+      success: true,
+      data: post,
+    });
+  } catch (error) {
+    console.error("Error updating post with direct upload:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPost,
   createPostWithDirectUpload,
@@ -817,6 +959,7 @@ module.exports = {
   getFeedPosts,
   getPost,
   updatePost,
+  updatePostWithDirectUpload,
   deletePost,
   likePost,
   unlikePost,

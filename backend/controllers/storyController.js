@@ -1,5 +1,33 @@
 const Story = require("../model/Story");
 const User = require("../model/User");
+const { cloudinary } = require("../middleware/upload");
+
+// Helper function to extract public ID from Cloudinary URL
+const extractPublicIdFromUrl = (url) => {
+  try {
+    if (!url) return null;
+
+    // Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/social-media-app/stories/story_1234567890.jpg
+    // or https://res.cloudinary.com/cloud-name/video/upload/v1234567890/social-media-app/stories/story_1234567890.mp4
+
+    // Extract the path after /upload/
+    const uploadIndex = url.indexOf("/upload/");
+    if (uploadIndex === -1) return null;
+
+    const pathAfterUpload = url.substring(uploadIndex + 8);
+
+    // Remove version number if present (v1234567890/)
+    const versionRemoved = pathAfterUpload.replace(/^v\d+\//, "");
+
+    // Remove file extension
+    const publicId = versionRemoved.replace(/\.[^/.]+$/, "");
+
+    return publicId;
+  } catch (error) {
+    console.error("Error extracting public ID:", error);
+    return null;
+  }
+};
 
 // @desc    Create a story
 // @route   POST /api/stories
@@ -165,6 +193,20 @@ const deleteStory = async (req, res) => {
         success: false,
         message: "Not authorized to delete this story",
       });
+    }
+
+    // Delete media from Cloudinary if it exists
+    if (story.mediaUrl) {
+      try {
+        const publicId = extractPublicIdFromUrl(story.mediaUrl);
+        if (publicId) {
+          await cloudinary.uploader.destroy(publicId);
+          console.log(`Deleted media from Cloudinary: ${publicId}`);
+        }
+      } catch (cloudinaryError) {
+        console.error("Error deleting media from Cloudinary:", cloudinaryError);
+        // Continue with story deletion even if Cloudinary deletion fails
+      }
     }
 
     // Delete story
