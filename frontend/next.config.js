@@ -28,12 +28,15 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV || "development",
   },
-  // Enable experimental features in development only
-  ...(process.env.NODE_ENV === "development" && {
-    experimental: {
+  // Experimental features
+  experimental: {
+    // Disable the missingSuspenseWithCSRBailout warning in production
+    missingSuspenseWithCSRBailout: false,
+    // Development-only features
+    ...(process.env.NODE_ENV === "development" && {
       optimizeCss: true,
-    },
-  }),
+    }),
+  },
   // Production-specific settings
   ...(process.env.NODE_ENV === "production" && {
     compiler: {

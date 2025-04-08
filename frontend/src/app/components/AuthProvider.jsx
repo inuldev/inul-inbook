@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
 
 import Loader from "@/lib/Loader";
 import userStore from "@/store/userStore";
+import SearchParamsProvider from "./SearchParamsProvider";
+import PathnameProvider from "./PathnameProvider";
 
 const publicRoutes = ["/user-login", "/user-register", "/forgot-password"];
 
-export default function AuthProvider({ children }) {
+// Inner component that receives searchParams and pathname safely
+function AuthProviderCore({ searchParams, pathname, children }) {
   const { getCurrentUser, loading } = userStore();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const loginSuccess = searchParams.get("loginSuccess");
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -77,7 +77,7 @@ export default function AuthProvider({ children }) {
     };
 
     checkAuth();
-  }, [pathname, loginSuccess, getCurrentUser, authChecked]);
+  }, [pathname, loginSuccess, getCurrentUser, authChecked, setAuthChecked]);
 
   // Show minimal loading indicator while checking auth
   if (loading && !authChecked) {
@@ -89,4 +89,30 @@ export default function AuthProvider({ children }) {
   }
 
   return children;
+}
+
+// Component that receives searchParams and wraps with PathnameProvider
+function AuthProviderInner({ searchParams, children }) {
+  return (
+    <PathnameProvider>
+      {(pathname) => (
+        <AuthProviderCore searchParams={searchParams} pathname={pathname}>
+          {children}
+        </AuthProviderCore>
+      )}
+    </PathnameProvider>
+  );
+}
+
+// Main AuthProvider that wraps everything with SearchParamsProvider
+export default function AuthProvider({ children }) {
+  return (
+    <SearchParamsProvider>
+      {(searchParams) => (
+        <AuthProviderInner searchParams={searchParams}>
+          {children}
+        </AuthProviderInner>
+      )}
+    </SearchParamsProvider>
+  );
 }
