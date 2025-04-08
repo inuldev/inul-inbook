@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+
 import userStore from "@/store/userStore";
 import { storeAuthError } from "@/lib/authDebug";
+import { debugLog, logAuthState } from "@/lib/debugUtils";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -16,9 +18,18 @@ export default function AuthCallbackPage() {
 
     const processAuth = async () => {
       try {
-        console.log("=== Auth Callback Started ===");
+        debugLog("auth", "=== Auth Callback Started ===");
+        logAuthState();
+
         const token = searchParams.get("token");
         const success = searchParams.get("success");
+
+        // Log all parameters
+        const allParams = {};
+        searchParams.forEach((value, key) => {
+          allParams[key] = value;
+        });
+        debugLog("auth", "Auth callback parameters", allParams);
 
         if (success !== "true" || !token) {
           const errorMessage =
@@ -44,12 +55,30 @@ export default function AuthCallbackPage() {
         localStorage.setItem("auth_token", token);
         localStorage.setItem("auth_user", JSON.stringify(userData));
 
+        debugLog("auth", "Authentication successful", {
+          userData,
+          token: token ? token.substring(0, 10) + "..." : null,
+          localStorage: {
+            hasToken: !!localStorage.getItem("auth_token"),
+            hasUser: !!localStorage.getItem("auth_user"),
+          },
+        });
+
+        logAuthState();
+
         if (isSubscribed) {
           setProcessing(false);
-          router.push("/?loginSuccess=true");
+          // Add a small delay to ensure logs are captured
+          setTimeout(() => {
+            debugLog("auth", "Redirecting to home page");
+            router.push("/?loginSuccess=true");
+          }, 500);
         }
       } catch (err) {
-        console.error("Auth callback error:", err);
+        debugLog("auth", "Auth callback error", {
+          error: err.message,
+          stack: err.stack,
+        });
 
         // Use existing auth debug utility
         storeAuthError("Auth callback failed", {
@@ -62,10 +91,18 @@ export default function AuthCallbackPage() {
           },
         });
 
+        // Log the current state
+        logAuthState();
+
         if (isSubscribed) {
           setProcessing(false);
           setError(err.message);
-          setTimeout(() => router.push("/user-login"), 3000);
+
+          // Add a small delay to ensure logs are captured
+          setTimeout(() => {
+            debugLog("auth", "Redirecting to login page after error");
+            router.push("/user-login");
+          }, 3000);
         }
       }
     };

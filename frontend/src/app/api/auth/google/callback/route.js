@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Mark this route as dynamic to prevent static prerendering
+export const dynamic = "force-dynamic";
+
 /**
  * This route proxies the Google OAuth callback to the backend
  */
@@ -84,6 +87,11 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Google OAuth callback proxy error:", error);
-    return NextResponse.redirect("/user-login?error=Authentication+failed");
+    // Use absolute URL for redirect
+    const baseUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || "https://inul2-inbook.vercel.app";
+    return NextResponse.redirect(
+      `${baseUrl}/user-login?error=Authentication+failed`
+    );
   }
 }

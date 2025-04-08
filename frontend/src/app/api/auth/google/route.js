@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Mark this route as dynamic to prevent static prerendering
+export const dynamic = "force-dynamic";
+
 /**
  * This route proxies the Google OAuth initiation to the backend
  */
