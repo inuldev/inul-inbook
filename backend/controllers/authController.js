@@ -222,12 +222,17 @@ const handleGoogleCallback = (req, res) => {
       path: "/",
     });
 
-    // Pass the token in the URL for the frontend to use
-    // This is a workaround for cross-domain cookie issues
+    // Pass the token in the URL for the frontend to use with local storage
+    // This is a more reliable solution for cross-domain authentication issues
     res.redirect(
-      `${
-        config.frontendUrl
-      }?loginSuccess=true&tokenSet=true&token=${encodeURIComponent(token)}`
+      `${config.frontendUrl}/auth-callback?` +
+        `provider=google&` +
+        `success=true&` +
+        `token=${encodeURIComponent(token)}&` +
+        `userId=${encodeURIComponent(req.user._id)}&` +
+        `username=${encodeURIComponent(req.user.username || "")}&` +
+        `email=${encodeURIComponent(req.user.email || "")}&` +
+        `profilePicture=${encodeURIComponent(req.user.profilePicture || "")}`
     );
   } catch (error) {
     console.error("Google callback error:", error);

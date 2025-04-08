@@ -139,8 +139,18 @@ function AuthProviderCore({ searchParams, pathname, children }) {
         }
       }
 
+      // Check for authentication in local storage
+      const localStorageAuthChecked = userStore
+        .getState()
+        .setAuthFromLocalStorage();
+      if (localStorageAuthChecked) {
+        console.log("Authenticated from local storage");
+        setAuthChecked(true);
+        return;
+      }
+
       if (!hasToken && !hasAuthStatus) {
-        console.log("No auth tokens found");
+        console.log("No auth tokens found in cookies or local storage");
         userStore.setState({
           isAuthenticated: false,
           user: null,

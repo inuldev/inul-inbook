@@ -14,6 +14,35 @@ const userStore = create((set) => ({
   error: null,
   tokenFromUrl: null, // Store token from URL for cross-domain authentication
 
+  // Set authentication from local storage (for cross-domain auth)
+  setAuthFromLocalStorage: () => {
+    try {
+      // Check if we're in a browser environment
+      if (typeof window === "undefined") return;
+
+      const token = localStorage.getItem("auth_token");
+      const userJson = localStorage.getItem("auth_user");
+
+      if (token && userJson) {
+        const user = JSON.parse(userJson);
+        console.log("Setting auth from local storage", { user });
+
+        set({
+          user,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error setting auth from local storage:", error);
+      return false;
+    }
+  },
+
   login: async (credentials) => {
     set({ loading: true, error: null });
     try {
@@ -55,6 +84,13 @@ const userStore = create((set) => ({
         sameSite: "lax",
       });
 
+      // Store authentication in local storage for cross-domain auth
+      if (typeof window !== "undefined") {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("auth_user", JSON.stringify(data.user));
+        console.log("Stored authentication in local storage");
+      }
+
       set({
         user: data.user, // Updated to match the response structure from backend
         isAuthenticated: true,
@@ -85,7 +121,7 @@ const userStore = create((set) => ({
 
     set({ loading: true, error: null });
     try {
-      // Check if token exists in cookies
+      // Check if token exists in cookies or local storage
       const cookies = getAllCookies();
       console.log("Current cookies in getCurrentUser:", cookies);
 
@@ -93,9 +129,22 @@ const userStore = create((set) => ({
       const hasAuthStatus = hasCookie("auth_status");
       const { tokenFromUrl } = userStore.getState();
 
+      // Check for token in local storage (for cross-domain auth)
+      const localStorageToken =
+        typeof window !== "undefined"
+          ? localStorage.getItem("auth_token")
+          : null;
+
+      console.log("Auth sources available:", {
+        cookieToken: hasToken,
+        cookieAuthStatus: hasAuthStatus,
+        urlToken: !!tokenFromUrl,
+        localStorageToken: !!localStorageToken,
+      });
+
       // Check if we have any form of authentication
-      if (!hasToken && !hasAuthStatus && !tokenFromUrl) {
-        console.log("No authentication tokens found in cookies or URL");
+      if (!hasToken && !hasAuthStatus && !tokenFromUrl && !localStorageToken) {
+        console.log("No authentication tokens found in any source");
         throw new Error("No authentication token found");
       }
 
@@ -110,10 +159,13 @@ const userStore = create((set) => ({
         Expires: "0",
       };
 
-      // Add Authorization header if we have a token from URL
+      // Add Authorization header if we have a token from any source
       if (tokenFromUrl) {
         headers["Authorization"] = `Bearer ${tokenFromUrl}`;
         console.log("Using token from URL for authorization");
+      } else if (localStorageToken) {
+        headers["Authorization"] = `Bearer ${localStorageToken}`;
+        console.log("Using token from local storage for authorization");
       }
 
       const response = await fetch(
@@ -181,6 +233,13 @@ const userStore = create((set) => ({
       });
       console.log("Cleared auth cookies");
 
+      // Clear local storage auth data
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
+        console.log("Cleared local storage auth data");
+      }
+
       set({
         user: null,
         isAuthenticated: false,
@@ -230,6 +289,15 @@ const userStore = create((set) => ({
         secure: window.location.protocol === "https:",
         sameSite: "lax",
       });
+
+      // Store authentication in local storage for cross-domain auth
+      if (typeof window !== "undefined") {
+        localStorage.setItem("auth_token", data.token);
+        localStorage.setItem("auth_user", JSON.stringify(data.user));
+        console.log(
+          "Stored authentication in local storage after registration"
+        );
+      }
 
       set({
         user: data.user,
