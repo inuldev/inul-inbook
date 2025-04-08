@@ -359,6 +359,12 @@ const usePostStore = create((set) => ({
     }
   },
 
+  // Add a post to the store
+  addPost: (post) =>
+    set((state) => ({
+      posts: [post, ...state.posts],
+    })),
+
   // Clear posts
   clearPosts: () => {
     set({

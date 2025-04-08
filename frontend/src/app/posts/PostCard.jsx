@@ -180,21 +180,32 @@ const PostCard = ({ post }) => {
 
           <p className="mb-4">{post?.content}</p>
 
-          {post?.mediaUrl && post.mediaType === "image" && (
-            <img
-              src={post?.mediaUrl}
-              alt="post_image"
-              className="w-full h-auto rounded-lg mb-4 object-contain max-h-[500px]"
-            />
-          )}
-          {post?.mediaUrl && post.mediaType === "video" && (
-            <video
-              controls
-              className="w-full rounded-lg mb-4 object-contain max-h-[500px]"
-            >
-              <source src={post?.mediaUrl} type="video/mp4" />
-              Your browser does not support the video tag
-            </video>
+          {post?.mediaUrl && (
+            <div className="relative rounded-lg overflow-hidden mb-4 bg-gray-100 dark:bg-gray-800">
+              {post.mediaType === "image" ? (
+                <div className="flex items-center justify-center">
+                  <img
+                    src={post?.mediaUrl}
+                    alt="post_image"
+                    className="w-full h-auto object-contain max-h-[500px]"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                post.mediaType === "video" && (
+                  <div className="flex items-center justify-center">
+                    <video
+                      controls
+                      className="w-full object-contain max-h-[500px]"
+                      preload="metadata"
+                    >
+                      <source src={post?.mediaUrl} type="video/mp4" />
+                      Your browser does not support the video tag
+                    </video>
+                  </div>
+                )
+              )}
+            </div>
           )}
 
           <div className="flex justify-between items-center mb-4">

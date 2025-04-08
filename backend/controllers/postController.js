@@ -27,7 +27,9 @@ const createPost = async (req, res) => {
     // Add media if uploaded
     if (req.file) {
       postData.mediaUrl = req.file.path;
-      postData.mediaType = req.file.mimetype.startsWith("image") ? "image" : "video";
+      postData.mediaType = req.file.mimetype.startsWith("image")
+        ? "image"
+        : "video";
     }
 
     // Create post
@@ -107,10 +109,7 @@ const getFeedPosts = async (req, res) => {
 
     // Get posts from followed users and own posts
     const posts = await Post.find({
-      $or: [
-        { user: { $in: user.following } },
-        { user: req.user.id },
-      ],
+      $or: [{ user: { $in: user.following } }, { user: req.user.id }],
     })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -122,10 +121,7 @@ const getFeedPosts = async (req, res) => {
 
     // Get total count
     const total = await Post.countDocuments({
-      $or: [
-        { user: { $in: user.following } },
-        { user: req.user.id },
-      ],
+      $or: [{ user: { $in: user.following } }, { user: req.user.id }],
     });
 
     res.status(200).json({
@@ -356,9 +352,7 @@ const unlikePost = async (req, res) => {
     }
 
     // Remove like
-    post.likes = post.likes.filter(
-      (id) => id.toString() !== req.user.id
-    );
+    post.likes = post.likes.filter((id) => id.toString() !== req.user.id);
     post.likeCount -= 1;
 
     // Save post
@@ -466,7 +460,10 @@ const getPostComments = async (req, res) => {
     }
 
     // Get comments
-    const comments = await Comment.find({ post: req.params.id, parentComment: null })
+    const comments = await Comment.find({
+      post: req.params.id,
+      parentComment: null,
+    })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -483,7 +480,10 @@ const getPostComments = async (req, res) => {
       });
 
     // Get total count
-    const total = await Comment.countDocuments({ post: req.params.id, parentComment: null });
+    const total = await Comment.countDocuments({
+      post: req.params.id,
+      parentComment: null,
+    });
 
     res.status(200).json({
       success: true,
@@ -593,7 +593,10 @@ const deleteComment = async (req, res) => {
         post.comments = post.comments.filter(
           (id) => id.toString() !== req.params.id
         );
-        post.commentCount = Math.max(0, post.commentCount - 1 - comment.replies.length);
+        post.commentCount = Math.max(
+          0,
+          post.commentCount - 1 - comment.replies.length
+        );
         await post.save();
       }
     } else {
@@ -690,9 +693,7 @@ const unlikeComment = async (req, res) => {
     }
 
     // Remove like
-    comment.likes = comment.likes.filter(
-      (id) => id.toString() !== req.user.id
-    );
+    comment.likes = comment.likes.filter((id) => id.toString() !== req.user.id);
     comment.likeCount -= 1;
 
     // Save comment
@@ -758,8 +759,60 @@ const getUserPosts = async (req, res) => {
   }
 };
 
+// @desc    Create a post with direct upload URL
+// @route   POST /api/posts/direct
+// @access  Private
+const createPostWithDirectUpload = async (req, res) => {
+  try {
+    const { content, privacy, mediaUrl, mediaType } = req.body;
+
+    // Check if content is provided
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        message: "Content is required",
+      });
+    }
+
+    // Create post object
+    const postData = {
+      user: req.user.id,
+      content,
+      privacy: privacy || "public",
+    };
+
+    // Add media if provided
+    if (mediaUrl) {
+      postData.mediaUrl = mediaUrl;
+      postData.mediaType = mediaType || "image";
+    }
+
+    // Create post
+    const post = await Post.create(postData);
+
+    // Populate user data
+    const populatedPost = await Post.findById(post._id).populate({
+      path: "user",
+      select: "username profilePicture",
+    });
+
+    res.status(201).json({
+      success: true,
+      data: populatedPost,
+    });
+  } catch (error) {
+    console.error("Error creating post with direct upload:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPost,
+  createPostWithDirectUpload,
   getPosts,
   getFeedPosts,
   getPost,

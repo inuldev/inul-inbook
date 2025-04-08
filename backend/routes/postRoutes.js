@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   createPost,
+  createPostWithDirectUpload,
   getPosts,
   getFeedPosts,
   getPost,
@@ -29,6 +30,7 @@ router.get("/:id/comments", getPostComments);
 
 // Protected routes
 router.post("/", protect, postUpload.single("media"), createPost);
+router.post("/direct", protect, createPostWithDirectUpload);
 router.post("/upload-signature", protect, (req, res) => {
   try {
     const { publicId } = req.body;

@@ -28,6 +28,7 @@ import {
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
 import CloudinaryUploader from "../components/CloudinaryUploader";
+import config from "@/lib/config";
 
 const Picker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -65,13 +66,29 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
       setPostError(null);
 
       if (mediaData) {
-        // Create post with already uploaded media
-        await createPost({
-          content: postContent,
-          privacy,
-          mediaUrl: mediaData.url,
-          mediaType: mediaData.type,
-        });
+        // Create post with already uploaded media URL
+        await fetch(`${config.backendUrl}/api/posts/direct`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: postContent,
+            privacy,
+            mediaUrl: mediaData.url,
+            mediaType: mediaData.type,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.success) {
+              throw new Error(data.message || "Failed to create post");
+            }
+
+            // Update posts in store
+            usePostStore.getState().addPost(data.data);
+          });
       } else {
         // Create post without media
         await createPost({

@@ -75,12 +75,18 @@ const VideoCard = ({ post }) => {
             <span className="text-sm">22-03-2025</span>
           </div>
         </div>
-        <div className="relative aspect-video bg-black mb-4">
+        <div className="relative bg-black mb-4 rounded-lg overflow-hidden">
           {post?.mediaUrl && (
-            <video controls className="w-full h-[500px] rounded-lg mb-4">
-              <source src={post?.mediaUrl} type="video/mp4" />
-              Your browser does not support the video tag
-            </video>
+            <div className="flex items-center justify-center">
+              <video
+                controls
+                className="w-full object-contain max-h-[500px]"
+                preload="metadata"
+              >
+                <source src={post?.mediaUrl} type="video/mp4" />
+                Your browser does not support the video tag
+              </video>
+            </div>
           )}
         </div>
 
