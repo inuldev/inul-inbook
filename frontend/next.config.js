@@ -64,6 +64,19 @@ const nextConfig = {
         permanent: false,
         destination: "/user-login",
       },
+      // Handle Google OAuth callback
+      {
+        source: "/",
+        has: [
+          {
+            type: "query",
+            key: "loginSuccess",
+            value: "true",
+          },
+        ],
+        permanent: false,
+        destination: "/google-callback",
+      },
     ];
   },
   async rewrites() {

@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
+import {
+  logAuthDebugInfo,
+  getStoredAuthError,
+  clearStoredAuthError,
+} from "@/lib/authDebug";
 
 import { Button } from "@/components/ui/button";
 import { ButtonSpinner } from "@/components/ui/spinner";
@@ -26,6 +32,7 @@ import userStore from "@/store/userStore";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { register, loading, error, clearErrors } = userStore();
 
   const [username, setUsername] = useState("");
@@ -37,6 +44,32 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
+
+  // Check for auth errors on page load
+  useEffect(() => {
+    // Check for error parameter in URL
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setFormError(`Authentication error: ${errorParam}`);
+    }
+
+    // Check for stored auth errors
+    const storedError = getStoredAuthError();
+    if (storedError && !errorParam) {
+      setFormError(
+        `${storedError.message} (${new Date(
+          storedError.timestamp
+        ).toLocaleTimeString()})`
+      );
+      // Clear the stored error after displaying it
+      clearStoredAuthError();
+    }
+
+    // Log debug info
+    logAuthDebugInfo("register-page", {
+      searchParams: Object.fromEntries(searchParams.entries()),
+    });
+  }, [searchParams]);
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -78,8 +111,29 @@ export default function RegisterPage() {
     }
   };
 
+  // Get the Google auth hook
+  const {
+    initiateGoogleLogin,
+    loading: googleLoading,
+    error: googleError,
+  } = useGoogleAuth();
+
   const handleGoogleLogin = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
+    // Clear any existing errors
+    clearErrors();
+    setFormError("");
+
+    // Set loading state
+    setRedirecting(true);
+
+    // Initiate Google login
+    const success = initiateGoogleLogin(clearErrors);
+
+    // If there was an immediate error (rare), handle it
+    if (!success && googleError) {
+      setFormError(googleError);
+      setRedirecting(false);
+    }
   };
 
   return (

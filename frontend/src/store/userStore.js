@@ -1,5 +1,11 @@
 import { create } from "zustand";
 import config from "@/lib/config";
+import {
+  setCookie,
+  deleteCookie,
+  hasCookie,
+  getAllCookies,
+} from "@/lib/cookieUtils";
 
 const userStore = create((set) => ({
   user: null,
@@ -28,21 +34,25 @@ const userStore = create((set) => ({
       }
 
       // Check if token cookie was set
-      const hasToken = document.cookie.includes("token=");
+      const hasToken = hasCookie("token");
       console.log("Token cookie present after login:", hasToken);
 
       if (!hasToken) {
         console.warn("No token cookie found after successful login");
         // If cookie wasn't set, try to set it manually
-        document.cookie = `token=${data.token}; path=/; max-age=${
-          60 * 60 * 24 * 30
-        }`;
+        setCookie("token", data.token, {
+          maxAge: 60 * 60 * 24 * 30, // 30 days
+          secure: window.location.protocol === "https:",
+          sameSite: "lax",
+        });
       }
 
       // Also set a non-httpOnly cookie for client-side detection
-      document.cookie = `auth_status=logged_in; path=/; max-age=${
-        60 * 60 * 24 * 30
-      }`;
+      setCookie("auth_status", "logged_in", {
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        secure: window.location.protocol === "https:",
+        sameSite: "lax",
+      });
 
       set({
         user: data.user, // Updated to match the response structure from backend
@@ -75,11 +85,11 @@ const userStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       // Check if token exists in cookies
-      const cookies = document.cookie;
+      const cookies = getAllCookies();
       console.log("Current cookies in getCurrentUser:", cookies);
 
-      const hasToken = cookies.includes("token=");
-      const hasAuthStatus = cookies.includes("auth_status=");
+      const hasToken = hasCookie("token");
+      const hasAuthStatus = hasCookie("auth_status");
 
       if (!hasToken && !hasAuthStatus) {
         console.log("No authentication tokens found in cookies");
@@ -148,10 +158,14 @@ const userStore = create((set) => ({
       }
 
       // Clear both cookies
-      document.cookie =
-        "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie =
-        "auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      deleteCookie("token", {
+        secure: window.location.protocol === "https:",
+        sameSite: "lax",
+      });
+      deleteCookie("auth_status", {
+        secure: window.location.protocol === "https:",
+        sameSite: "lax",
+      });
       console.log("Cleared auth cookies");
 
       set({
@@ -191,12 +205,16 @@ const userStore = create((set) => ({
       }
 
       // Set auth cookies
-      document.cookie = `token=${data.token}; path=/; max-age=${
-        60 * 60 * 24 * 30
-      }`;
-      document.cookie = `auth_status=logged_in; path=/; max-age=${
-        60 * 60 * 24 * 30
-      }`;
+      setCookie("token", data.token, {
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        secure: window.location.protocol === "https:",
+        sameSite: "lax",
+      });
+      setCookie("auth_status", "logged_in", {
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        secure: window.location.protocol === "https:",
+        sameSite: "lax",
+      });
 
       set({
         user: data.user,

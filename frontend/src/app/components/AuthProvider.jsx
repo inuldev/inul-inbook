@@ -6,6 +6,7 @@ import Loader from "@/lib/Loader";
 import userStore from "@/store/userStore";
 import SearchParamsProvider from "./SearchParamsProvider";
 import PathnameProvider from "./PathnameProvider";
+import { hasCookie } from "@/lib/cookieUtils";
 
 const publicRoutes = ["/user-login", "/user-register", "/forgot-password"];
 
@@ -29,10 +30,10 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       if (authChecked && !loginSuccess) return;
 
       console.log("Checking auth in AuthProvider");
-      console.log("All cookies:", document.cookie);
+      console.log("Checking for auth cookies");
 
-      const hasToken = document.cookie.includes("token=");
-      const hasAuthStatus = document.cookie.includes("auth_status=");
+      const hasToken = hasCookie("token");
+      const hasAuthStatus = hasCookie("auth_status");
 
       // Special handling for Google OAuth callback
       if (loginSuccess === "true") {

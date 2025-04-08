@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
+import {
+  logAuthDebugInfo,
+  getStoredAuthError,
+  clearStoredAuthError,
+} from "@/lib/authDebug";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +25,7 @@ import userStore from "@/store/userStore";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, loading, error, clearErrors } = userStore();
 
   const [email, setEmail] = useState("");
@@ -26,6 +33,32 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
+
+  // Check for auth errors on page load
+  useEffect(() => {
+    // Check for error parameter in URL
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      setFormError(`Authentication error: ${errorParam}`);
+    }
+
+    // Check for stored auth errors
+    const storedError = getStoredAuthError();
+    if (storedError && !errorParam) {
+      setFormError(
+        `${storedError.message} (${new Date(
+          storedError.timestamp
+        ).toLocaleTimeString()})`
+      );
+      // Clear the stored error after displaying it
+      clearStoredAuthError();
+    }
+
+    // Log debug info
+    logAuthDebugInfo("login-page", {
+      searchParams: Object.fromEntries(searchParams.entries()),
+    });
+  }, [searchParams]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -71,30 +104,27 @@ export default function LoginPage() {
     }
   };
 
+  // Get the Google auth hook
+  const {
+    initiateGoogleLogin,
+    loading: googleLoading,
+    error: googleError,
+  } = useGoogleAuth();
+
   const handleGoogleLogin = () => {
-    try {
-      // Save current URL to session storage for potential redirect after login
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("loginRedirectUrl", window.location.pathname);
-      }
+    // Clear any existing errors
+    clearErrors();
+    setFormError("");
 
-      // Use window.location for OAuth redirect as router.push won't work for external URLs
-      const googleAuthUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/google`;
-      console.log("Redirecting to Google OAuth:", googleAuthUrl);
+    // Set loading state
+    setRedirecting(true);
 
-      // Clear any existing errors before redirecting
-      clearErrors();
+    // Initiate Google login
+    const success = initiateGoogleLogin(clearErrors);
 
-      // Set loading state to prevent multiple clicks
-      setRedirecting(true);
-
-      // Redirect to Google OAuth
-      window.location.href = googleAuthUrl;
-    } catch (error) {
-      console.error("Error redirecting to Google OAuth:", error);
-      setFormError(
-        "Failed to connect to authentication service. Please try again."
-      );
+    // If there was an immediate error (rare), handle it
+    if (!success && googleError) {
+      setFormError(googleError);
       setRedirecting(false);
     }
   };
