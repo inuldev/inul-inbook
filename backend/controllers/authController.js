@@ -197,46 +197,61 @@ const handleGoogleCallback = (req, res) => {
     // Generate JWT token
     const token = generateToken(req.user._id);
 
-    // Use the same cookie options as in sendTokenResponse
+    // Prepare user data
+    const userData = {
+      _id: req.user._id,
+      username: req.user.username || "",
+      email: req.user.email || "",
+      profilePicture: req.user.profilePicture || "",
+    };
+
+    // Build the redirect URL with all necessary parameters
+    const redirectUrl = new URL(`${config.frontendUrl}/auth-callback`);
+    const params = new URLSearchParams({
+      provider: "google",
+      success: "true",
+      token: token,
+      userId: userData._id.toString(),
+      username: userData.username,
+      email: userData.email,
+      profilePicture: userData.profilePicture,
+      tokenSet: "true",
+      timestamp: Date.now().toString(),
+    });
+    redirectUrl.search = params.toString();
+
+    // Set cookies as a backup mechanism
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       httpOnly: true,
-      secure: config.isProduction || config.frontendUrl.startsWith("https"),
-      sameSite: config.isProduction ? "none" : "lax",
+      secure: true, // Always set secure in production
+      sameSite: "none", // Required for cross-site cookies
       path: "/",
-      // Don't set domain to allow the browser to use the current domain
     };
 
-    console.log("Setting Google OAuth cookie with options:", cookieOptions);
-    console.log("Token being set:", token.substring(0, 10) + "...");
-
-    // Set the cookie
+    // Set multiple cookies with different security settings
     res.cookie("token", token, cookieOptions);
 
-    // Also set a non-httpOnly cookie for client-side detection
+    // Set a non-httpOnly cookie for client-side detection
     res.cookie("auth_status", "logged_in", {
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      ...cookieOptions,
       httpOnly: false,
-      secure: config.isProduction || config.frontendUrl.startsWith("https"),
-      sameSite: config.isProduction ? "none" : "lax",
-      path: "/",
     });
 
-    // Pass the token in the URL for the frontend to use with local storage
-    // This is a more reliable solution for cross-domain authentication issues
-    res.redirect(
-      `${config.frontendUrl}/auth-callback?` +
-        `provider=google&` +
-        `success=true&` +
-        `token=${encodeURIComponent(token)}&` +
-        `userId=${encodeURIComponent(req.user._id)}&` +
-        `username=${encodeURIComponent(req.user.username || "")}&` +
-        `email=${encodeURIComponent(req.user.email || "")}&` +
-        `profilePicture=${encodeURIComponent(req.user.profilePicture || "")}`
-    );
+    console.log("Cookies being set:", {
+      token: token.substring(0, 10) + "...",
+      cookieOptions,
+    });
+
+    // Redirect to the frontend with all parameters
+    return res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error("Google callback error:", error);
-    res.redirect(`${config.frontendUrl}/user-login?error=Server error`);
+    return res.redirect(
+      `${config.frontendUrl}/user-login?error=${encodeURIComponent(
+        "Server error during authentication"
+      )}`
+    );
   }
 };
 
