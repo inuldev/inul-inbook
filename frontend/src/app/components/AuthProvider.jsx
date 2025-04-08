@@ -42,9 +42,54 @@ function AuthProviderCore({ searchParams, pathname, children }) {
         console.log("Auth status cookie present:", hasAuthStatus);
         console.log("All cookies:", document.cookie);
 
-        // If we have tokens, try to fetch user data
+        // Check for token in URL - this is our primary method in production
+        const tokenFromUrl = searchParams.get("token");
+        if (tokenFromUrl) {
+          console.log("Token found in URL, will use this for authentication");
+
+          // Set cookies manually with different options for different environments
+          const isSecure = window.location.protocol === "https:";
+          const isProduction = window.location.hostname !== "localhost";
+
+          // Set the token cookie directly
+          document.cookie = `token=${encodeURIComponent(
+            tokenFromUrl
+          )}; path=/; max-age=${60 * 60 * 24 * 30}${
+            isSecure ? "; Secure" : ""
+          }; SameSite=${isProduction ? "None" : "Lax"}`;
+          document.cookie = `auth_status=logged_in; path=/; max-age=${
+            60 * 60 * 24 * 30
+          }${isSecure ? "; Secure" : ""}; SameSite=Lax`;
+
+          console.log("Cookies set directly from URL token");
+
+          // Verify cookies were set
+          const hasTokenNow = document.cookie.includes("token=");
+          const hasAuthStatusNow = document.cookie.includes("auth_status=");
+          console.log("Token cookie now present:", hasTokenNow);
+          console.log("Auth status cookie now present:", hasAuthStatusNow);
+
+          // Try to fetch user data with the token
+          try {
+            // Use the token directly in the Authorization header
+            userStore.setState({ tokenFromUrl: tokenFromUrl });
+            await getCurrentUser();
+            setAuthChecked(true);
+
+            // Remove token from URL without page reload
+            const url = new URL(window.location.href);
+            url.searchParams.delete("token");
+            window.history.replaceState({}, document.title, url.toString());
+            return;
+          } catch (error) {
+            console.error("Error fetching user with URL token:", error);
+            userStore.setState({ tokenFromUrl: null });
+          }
+        }
+
+        // If we have tokens in cookies, try to fetch user data
         if (hasToken || hasAuthStatus) {
-          console.log("Auth tokens found, fetching user data");
+          console.log("Auth tokens found in cookies, fetching user data");
           try {
             await getCurrentUser();
             setAuthChecked(true);

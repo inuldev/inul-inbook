@@ -12,6 +12,7 @@ const userStore = create((set) => ({
   isAuthenticated: false,
   loading: true,
   error: null,
+  tokenFromUrl: null, // Store token from URL for cross-domain authentication
 
   login: async (credentials) => {
     set({ loading: true, error: null });
@@ -90,25 +91,37 @@ const userStore = create((set) => ({
 
       const hasToken = hasCookie("token");
       const hasAuthStatus = hasCookie("auth_status");
+      const { tokenFromUrl } = userStore.getState();
 
-      if (!hasToken && !hasAuthStatus) {
-        console.log("No authentication tokens found in cookies");
+      // Check if we have any form of authentication
+      if (!hasToken && !hasAuthStatus && !tokenFromUrl) {
+        console.log("No authentication tokens found in cookies or URL");
         throw new Error("No authentication token found");
       }
 
       // Add a timestamp to prevent caching
       const timestamp = new Date().getTime();
+
+      // Prepare headers
+      const headers = {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      };
+
+      // Add Authorization header if we have a token from URL
+      if (tokenFromUrl) {
+        headers["Authorization"] = `Bearer ${tokenFromUrl}`;
+        console.log("Using token from URL for authorization");
+      }
+
       const response = await fetch(
         `${config.backendUrl}/api/auth/me?_=${timestamp}`,
         {
           method: "GET",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
+          headers,
           timeout: config.apiTimeouts.medium,
         }
       );
@@ -172,6 +185,7 @@ const userStore = create((set) => ({
         user: null,
         isAuthenticated: false,
         error: null,
+        tokenFromUrl: null, // Clear the token from URL
       });
     } catch (error) {
       console.error("Error logging out:", error);
@@ -180,6 +194,7 @@ const userStore = create((set) => ({
       set({
         user: null,
         isAuthenticated: false,
+        tokenFromUrl: null, // Clear the token from URL
       });
     }
   },

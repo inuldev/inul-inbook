@@ -98,23 +98,65 @@ export function useGoogleAuth() {
         console.log("Token cookie present:", hasTokenCookie);
         console.log("Auth status cookie present:", hasAuthStatusCookie);
 
-        // Check if we have a token in the URL (for debugging only)
+        // Check if we have a token in the URL - this is our primary method in production
         const tokenParam = searchParams.get("token");
         if (tokenParam && tokenSet === "true") {
           console.log("Token found in URL, setting cookies manually");
 
-          // Set cookies manually
+          // Set cookies manually with different options for different environments
+          const isSecure = window.location.protocol === "https:";
+          const isProduction =
+            process.env.NODE_ENV === "production" ||
+            window.location.hostname !== "localhost";
+
+          console.log(
+            "Setting cookies with secure:",
+            isSecure,
+            "isProduction:",
+            isProduction
+          );
+
+          // Set the token cookie
           setCookie("token", tokenParam, {
             maxAge: 60 * 60 * 24 * 30, // 30 days
-            secure: window.location.protocol === "https:",
-            sameSite: "lax",
+            secure: isSecure,
+            sameSite: isProduction ? "none" : "lax",
           });
 
+          // Set the auth status cookie
           setCookie("auth_status", "logged_in", {
             maxAge: 60 * 60 * 24 * 30, // 30 days
-            secure: window.location.protocol === "https:",
-            sameSite: "lax",
+            secure: isSecure,
+            sameSite: "lax", // This can be lax for better compatibility
           });
+
+          // Also try setting cookies directly with document.cookie as a fallback
+          try {
+            document.cookie = `token=${encodeURIComponent(
+              tokenParam
+            )}; path=/; max-age=${60 * 60 * 24 * 30}${
+              isSecure ? "; Secure" : ""
+            }; SameSite=${isProduction ? "None" : "Lax"}`;
+            document.cookie = `auth_status=logged_in; path=/; max-age=${
+              60 * 60 * 24 * 30
+            }${isSecure ? "; Secure" : ""}; SameSite=Lax`;
+            console.log("Fallback cookies set directly");
+          } catch (cookieError) {
+            console.error("Error setting fallback cookies:", cookieError);
+          }
+
+          // Verify cookies were set
+          setTimeout(() => {
+            console.log("Cookies after setting:", document.cookie);
+            console.log(
+              "Token cookie present:",
+              document.cookie.includes("token=")
+            );
+            console.log(
+              "Auth status cookie present:",
+              document.cookie.includes("auth_status=")
+            );
+          }, 100);
         }
 
         // If token cookie is missing but auth was successful, set a fallback cookie
