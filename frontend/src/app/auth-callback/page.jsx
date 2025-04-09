@@ -48,6 +48,43 @@ export default function AuthCallbackPage() {
         // Set token in userStore state
         userStore.setState({ tokenFromUrl: token });
 
+        // Set token in cookies as well for redundancy
+        try {
+          const isSecure = window.location.protocol === "https:";
+          const isProduction =
+            process.env.NODE_ENV === "production" ||
+            window.location.hostname !== "localhost";
+
+          // Import the setCookie function dynamically to avoid issues
+          const { setCookie } = await import("@/lib/cookieUtils");
+
+          // Set the token cookie with appropriate security settings
+          setCookie("token", token, {
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+            secure: isSecure,
+            sameSite: isProduction ? "none" : "lax",
+          });
+
+          // Set the auth status cookie
+          setCookie("auth_status", "logged_in", {
+            maxAge: 60 * 60 * 24 * 30, // 30 days
+            secure: isSecure,
+            sameSite: "lax", // This can be lax for better compatibility
+          });
+
+          debugLog("auth", "Set cookies in auth-callback");
+        } catch (cookieError) {
+          debugLog(
+            "auth",
+            "Error setting cookies in auth-callback",
+            cookieError
+          );
+          // Non-fatal error, continue with localStorage
+        }
+
+        // Cookies should already be set by the backend, but we'll set them again for redundancy
+        // This helps with cross-domain authentication issues
+
         // Try to authenticate using getCurrentUser
         await userStore.getState().getCurrentUser();
 
@@ -71,7 +108,34 @@ export default function AuthCallbackPage() {
           // Add a small delay to ensure logs are captured
           setTimeout(() => {
             debugLog("auth", "Redirecting to home page");
-            router.push("/?loginSuccess=true");
+
+            // Get the callback URL from session storage if available
+            let redirectUrl = "/";
+            try {
+              const storedRedirectUrl =
+                sessionStorage.getItem("loginRedirectUrl");
+              if (
+                storedRedirectUrl &&
+                storedRedirectUrl !== "/user-login" &&
+                storedRedirectUrl !== "/user-register"
+              ) {
+                redirectUrl = storedRedirectUrl;
+                debugLog("auth", `Using stored redirect URL: ${redirectUrl}`);
+              }
+            } catch (e) {
+              debugLog(
+                "auth",
+                "Error getting redirect URL from session storage",
+                e
+              );
+            }
+
+            // Add login success parameter
+            const redirectUrlWithParams = redirectUrl.includes("?")
+              ? `${redirectUrl}&loginSuccess=true`
+              : `${redirectUrl}?loginSuccess=true`;
+
+            router.push(redirectUrlWithParams);
           }, 500);
         }
       } catch (err) {

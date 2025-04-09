@@ -11,9 +11,18 @@ export async function GET(request) {
     // Get the backend URL from environment variables
     // Make sure to handle empty strings properly
     let backendUrl = process.env.BACKEND_URL;
-    if (!backendUrl || backendUrl === '""' || backendUrl === "''") {
+    if (
+      !backendUrl ||
+      backendUrl === '""' ||
+      backendUrl === "''" ||
+      backendUrl === ""
+    ) {
+      // Use the hardcoded fallback URL only if no valid URL is provided
       backendUrl = "https://inul-inbook-backend.vercel.app";
     }
+
+    // Ensure the URL doesn't have trailing slashes that could cause issues
+    backendUrl = backendUrl.replace(/\/$/, "");
 
     console.log("Raw BACKEND_URL:", JSON.stringify(process.env.BACKEND_URL));
     console.log("Processed backendUrl:", backendUrl);
@@ -43,8 +52,13 @@ export async function GET(request) {
         "X-Forwarded-For": request.headers.get("x-forwarded-for") || "",
         "X-Real-IP": request.headers.get("x-real-ip") || "",
         "User-Agent": request.headers.get("user-agent") || "",
+        // Add origin and referer headers to help with CORS
+        Origin: request.headers.get("origin") || new URL(request.url).origin,
+        Referer: request.headers.get("referer") || new URL(request.url).origin,
       },
       redirect: "manual", // Don't follow redirects automatically
+      // Increase timeout for potentially slow responses
+      signal: AbortSignal.timeout(15000), // 15 second timeout
     });
 
     // Log response details
@@ -87,11 +101,23 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Google OAuth callback proxy error:", error);
-    // Use absolute URL for redirect
+    // Use absolute URL for redirect with detailed error information
     const baseUrl =
       process.env.NEXT_PUBLIC_FRONTEND_URL || "https://inul2-inbook.vercel.app";
+
+    // Include error details in the redirect URL for better debugging
+    const errorMessage = encodeURIComponent(
+      `Authentication failed: ${error.message || "Unknown error"}`
+    );
+
+    console.error("Detailed OAuth error:", {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    });
+
     return NextResponse.redirect(
-      `${baseUrl}/user-login?error=Authentication+failed`
+      `${baseUrl}/user-login?error=${errorMessage}&source=callback_proxy&time=${Date.now()}`
     );
   }
 }

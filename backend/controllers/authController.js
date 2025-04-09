@@ -220,14 +220,25 @@ const handleGoogleCallback = (req, res) => {
     });
     redirectUrl.search = params.toString();
 
-    // Set cookies as a backup mechanism
+    // Set cookies with appropriate security settings based on environment
+    const isProduction = config.isProduction;
+
+    // Base cookie options
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       httpOnly: true,
-      secure: true, // Always set secure in production
-      sameSite: "none", // Required for cross-site cookies
+      secure: isProduction, // Only set secure in production or if frontend uses HTTPS
+      sameSite: isProduction ? "none" : "lax", // Required for cross-site cookies in production
       path: "/",
     };
+
+    // Log the environment and cookie settings
+    console.log("Environment settings:", {
+      isProduction,
+      frontendUrl: config.frontendUrl,
+      secure: cookieOptions.secure,
+      sameSite: cookieOptions.sameSite,
+    });
 
     // Set multiple cookies with different security settings
     res.cookie("token", token, cookieOptions);
@@ -237,6 +248,20 @@ const handleGoogleCallback = (req, res) => {
       ...cookieOptions,
       httpOnly: false,
     });
+
+    // Set a fallback cookie with more permissive settings
+    // This helps with some browser compatibility issues
+    if (isProduction) {
+      try {
+        res.cookie("auth_fallback", "true", {
+          ...cookieOptions,
+          httpOnly: false,
+          sameSite: "lax", // More compatible setting
+        });
+      } catch (cookieError) {
+        console.error("Error setting fallback cookie:", cookieError);
+      }
+    }
 
     console.log("Cookies being set:", {
       token: token.substring(0, 10) + "...",

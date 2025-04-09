@@ -60,15 +60,27 @@ export function useGoogleAuth() {
       // With same-domain setup, we can use a relative URL
       let googleAuthUrl;
 
-      if (process.env.NODE_ENV === "production") {
-        // In production, use a direct URL to the Google OAuth endpoint
-        googleAuthUrl = "/api/auth/google"; // Relative URL for same-domain setup
-      } else {
-        // In development, use the full backend URL
-        const backendUrl =
-          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-        googleAuthUrl = `${backendUrl}/api/auth/google`;
-      }
+      // Always use the API route in Next.js for better error handling and debugging
+      // This ensures we go through our proxy which adds security and debugging
+      googleAuthUrl = "/api/auth/google";
+
+      // Add state parameter for security and tracking
+      const state = {
+        timestamp: Date.now(),
+        origin: window.location.origin,
+        path: window.location.pathname,
+        referrer: document.referrer,
+      };
+
+      // Store state in sessionStorage for verification on callback
+      sessionStorage.setItem("googleAuthState", JSON.stringify(state));
+
+      // Add state parameter to URL
+      googleAuthUrl += `?state=${encodeURIComponent(JSON.stringify(state))}`;
+
+      debugLog("oauth", "Using Google OAuth URL with state parameter", {
+        googleAuthUrl,
+      });
 
       debugLog("oauth", `Redirecting to Google OAuth: ${googleAuthUrl}`, {
         environment: process.env.NODE_ENV,
@@ -145,6 +157,38 @@ export function useGoogleAuth() {
       const loginSuccess = searchParams.get("loginSuccess");
       const tokenSet = searchParams.get("tokenSet");
       const provider = searchParams.get("provider");
+
+      // Verify state parameter if present (security check)
+      const stateParam = searchParams.get("state");
+      let stateValid = false;
+
+      if (stateParam) {
+        try {
+          // Get stored state from sessionStorage
+          const storedState = sessionStorage.getItem("googleAuthState");
+
+          if (storedState) {
+            const parsedStoredState = JSON.parse(storedState);
+            const parsedStateParam = JSON.parse(decodeURIComponent(stateParam));
+
+            // Check if timestamps are close (within 10 minutes)
+            const timeDiff = Math.abs(
+              parsedStateParam.timestamp - parsedStoredState.timestamp
+            );
+            stateValid = timeDiff < 10 * 60 * 1000; // 10 minutes
+
+            debugLog("oauth", "State validation", {
+              stateValid,
+              timeDiff,
+              storedState: parsedStoredState,
+              receivedState: parsedStateParam,
+            });
+          }
+        } catch (stateError) {
+          debugLog("oauth", "Error validating state parameter", stateError);
+          // Non-fatal error, continue with authentication
+        }
+      }
 
       debugLog("oauth", "Auth parameters", {
         loginSuccess,
