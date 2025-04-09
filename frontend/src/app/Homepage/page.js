@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 
-import PostCard from "../posts/PostCard";
+import MediaCard from "@/components/shared/MediaCard";
 import NewPostForm from "../posts/NewPostForm";
 import StorySection from "../story/StorySection";
 
@@ -43,7 +43,7 @@ const HomePage = () => {
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
           </div>
         ) : posts.length > 0 ? (
-          posts.map((post) => <PostCard key={post?._id} post={post} />)
+          posts.map((post) => <MediaCard key={post?._id} post={post} />)
         ) : (
           <div className="text-center py-10 text-gray-500 dark:text-gray-400">
             <p>No posts to display.</p>

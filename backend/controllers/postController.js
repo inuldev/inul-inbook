@@ -384,6 +384,7 @@ const likePost = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Post liked successfully",
+      userId: req.user.id,
     });
   } catch (error) {
     res.status(500).json({
@@ -427,6 +428,7 @@ const unlikePost = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Post unliked successfully",
+      userId: req.user.id,
     });
   } catch (error) {
     res.status(500).json({
@@ -735,6 +737,43 @@ const likeComment = async (req, res) => {
   }
 };
 
+// @desc    Share a post
+// @route   POST /api/posts/:id/share
+// @access  Private
+const sharePost = async (req, res) => {
+  try {
+    // Find post
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Post not found",
+      });
+    }
+
+    // Increment share count
+    post.shareCount = (post.shareCount || 0) + 1;
+
+    // Save post
+    await post.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Post shared successfully",
+      data: {
+        shareCount: post.shareCount,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Unlike a comment
 // @route   PUT /api/posts/comments/:id/unlike
 // @access  Private
@@ -969,5 +1008,6 @@ module.exports = {
   deleteComment,
   likeComment,
   unlikeComment,
+  sharePost,
   getUserPosts,
 };

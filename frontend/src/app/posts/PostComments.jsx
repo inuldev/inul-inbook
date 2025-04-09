@@ -83,7 +83,11 @@ const PostComments = ({ post }) => {
             onClick={handleAddComment}
             disabled={!commentText.trim() || isSubmitting}
           >
-            <Send className="h-5 w-5 text-blue-500" />
+            {isSubmitting ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <Send className="h-5 w-5 text-blue-500" />
+            )}
           </Button>
         </div>
       </div>

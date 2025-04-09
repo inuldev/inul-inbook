@@ -16,6 +16,7 @@ const {
   deleteComment,
   likeComment,
   unlikeComment,
+  sharePost,
   getUserPosts,
 } = require("../controllers/postController");
 const { protect } = require("../middleware/auth");
@@ -62,6 +63,7 @@ router.put("/:id/direct", protect, updatePostWithDirectUpload);
 router.delete("/:id", protect, deletePost);
 router.put("/:id/like", protect, likePost);
 router.put("/:id/unlike", protect, unlikePost);
+router.post("/:id/share", protect, sharePost);
 router.post("/:id/comment", protect, commentOnPost);
 router.post("/comments/:id/reply", protect, replyToComment);
 router.delete("/comments/:id", protect, deleteComment);

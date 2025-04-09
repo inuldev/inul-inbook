@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clock, MessageCircle, Share2, ThumbsUp, Send } from "lucide-react";
+import usePostStore from "@/store/postStore";
+import userStore from "@/store/userStore";
+import { format } from "date-fns";
+import {
+  showSuccessToast,
+  showErrorToast,
+  showInfoToast,
+} from "@/lib/toastUtils";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,33 +30,88 @@ import VideoComments from "./VideoComments";
 const VideoCard = ({ post }) => {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(post?.likeCount || 0);
+  const [commentCount, setCommentCount] = useState(post?.commentCount || 0);
+  const [shareCount, setShareCount] = useState(post?.shareCount || 0);
+  const { user } = userStore();
+  const commentInputRef = useRef(null);
+
+  // Check if the current user has liked this post
+  useEffect(() => {
+    if (post?.likes && user?._id) {
+      setIsLiked(post.likes.includes(user._id));
+    }
+
+    // Update counts from post data
+    setLikeCount(post?.likeCount || 0);
+    setCommentCount(post?.commentCount || 0);
+    setShareCount(post?.shareCount || 0);
+  }, [post, user]);
 
   const generateSharedLink = () => {
-    return `http://localhost:3000/${post?.id}`;
+    return `${
+      process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin
+    }/posts/${post?._id}`;
+  };
+
+  const handleLikeToggle = async () => {
+    try {
+      const postStore = usePostStore.getState();
+
+      if (isLiked) {
+        await postStore.unlikePost(post._id);
+        setIsLiked(false);
+        setLikeCount((prev) => Math.max(0, prev - 1));
+        showInfoToast("Post unliked");
+      } else {
+        await postStore.likePost(post._id);
+        setIsLiked(true);
+        setLikeCount((prev) => prev + 1);
+        showSuccessToast("Post liked");
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      showErrorToast("Failed to update like status");
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const postStore = usePostStore.getState();
+      const newComment = await postStore.addComment(post._id, commentText);
+
+      // Update the local post object with the new comment
+      if (!post.comments) {
+        post.comments = [];
+      }
+
+      post.comments = [newComment, ...post.comments];
+      setCommentCount((prev) => prev + 1);
+
+      // Clear the input
+      setCommentText("");
+
+      // Focus back on the input for easy commenting
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+      showSuccessToast("Comment added");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      showErrorToast("Failed to add comment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleShare = (platform) => {
-    const url = generateSharedLink();
-    let shareUrl;
-    switch (platform) {
-      case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-        break;
-      case "twitter":
-        shareUrl = `https://twitter.com/intent/tweet?url=${url}`;
-        break;
-      case "linkedin":
-        shareUrl = `https://www.linkedin.com/shareArticle?mini=true&url=${url}`;
-        break;
-      case "copy":
-        navigator.clipboard.writeText(url);
-        setIsShareDialogOpen(false);
-        return;
-      default:
-        return;
-    }
-    window.open(shareUrl, "_blank");
-    setIsShareDialogOpen(false);
+    showSuccessToast(`Post shared on ${platform}`);
   };
 
   return (
@@ -63,18 +126,32 @@ const VideoCard = ({ post }) => {
         <div className="flex items-center justify-between mb-4 px-4 mt-2">
           <div className="flex items-center">
             <Avatar className="h-10 w-10 rounded-full mr-3">
-              <AvatarImage />
-              <AvatarFallback className="dark:bg-gray-400">ID</AvatarFallback>
+              <AvatarImage src={post?.user?.profilePicture} />
+              <AvatarFallback className="dark:bg-gray-400">
+                {post?.user?.username?.substring(0, 2).toUpperCase() || "ID"}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-semibold dark:text-white">Inul Dev</p>
+              <p className="font-semibold dark:text-white">
+                {post?.user?.username || "Unknown User"}
+              </p>
             </div>
           </div>
           <div className="flex items-center text-gray-500 dark:text-gray-400">
             <Clock className="h-4 w-4 mr-1" />
-            <span className="text-sm">22-03-2025</span>
+            <span className="text-sm">
+              {post?.createdAt
+                ? format(new Date(post.createdAt), "MMM dd, yyyy")
+                : "Unknown date"}
+            </span>
           </div>
         </div>
+        {post?.content && (
+          <div className="px-4 mb-4">
+            <p className="text-gray-800 dark:text-gray-200">{post?.content}</p>
+          </div>
+        )}
+
         <div className="relative bg-black mb-4 rounded-lg overflow-hidden">
           {post?.mediaUrl && (
             <div className="flex items-center justify-center">
@@ -94,14 +171,18 @@ const VideoCard = ({ post }) => {
           <div className="flex space-x-4">
             <Button
               variant="ghost"
-              className={`flex dark:hover:bg-gray-600 items-center`}
+              className={`flex dark:hover:bg-gray-600 items-center ${
+                isLiked ? "text-blue-500 dark:text-blue-400" : ""
+              }`}
+              onClick={handleLikeToggle}
             >
               <ThumbsUp className="mr-2 h-4 w-4" />
-              <span>Like</span>
+              <span>{isLiked ? "Liked" : "Like"}</span>
             </Button>
             <Button
               variant="ghost"
               className={`flex dark:hover:bg-gray-600 items-center`}
+              onClick={() => setShowComments(!showComments)}
             >
               <MessageCircle className="mr-2 h-4 w-4" />
               <span>Comment</span>
@@ -115,6 +196,12 @@ const VideoCard = ({ post }) => {
                 <Button
                   variant="ghost"
                   className="flex items-center dark:hover:bg-gray-500"
+                  onClick={() => {
+                    // Increment share count when dialog is opened
+                    if (!isShareDialogOpen) {
+                      setShareCount((prev) => prev + 1);
+                    }
+                  }}
                 >
                   <Share2 className="mr-2 h-4 w-4" />
                   <span>Share</span>
@@ -127,34 +214,77 @@ const VideoCard = ({ post }) => {
                     Choose where you want to share this post
                   </DialogDescription>
                 </DialogHeader>
-                <div className="flex flex-col space-y-4 ">
-                  <Button onClick={() => handleShare("facebook")}>
+                <div className="flex flex-col space-y-4">
+                  <Button
+                    onClick={() => {
+                      const url = encodeURIComponent(generateSharedLink());
+                      window.open(
+                        `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+                        "_blank"
+                      );
+                      handleShare("facebook");
+                    }}
+                  >
                     Share on Facebook
                   </Button>
-                  <Button onClick={() => handleShare("twitter")}>
+                  <Button
+                    onClick={() => {
+                      const url = encodeURIComponent(generateSharedLink());
+                      const tweetText = encodeURIComponent(
+                        post?.content || "Check out this video!"
+                      );
+                      window.open(
+                        `https://twitter.com/intent/tweet?text=${tweetText}&url=${url}`,
+                        "_blank"
+                      );
+                      handleShare("twitter");
+                    }}
+                  >
                     Share on Twitter
                   </Button>
-                  <Button onClick={() => handleShare("linkedin")}>
+                  <Button
+                    onClick={() => {
+                      const url = encodeURIComponent(generateSharedLink());
+                      // LinkedIn only needs the URL for sharing
+                      window.open(
+                        `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+                        "_blank"
+                      );
+                      handleShare("linkedin");
+                    }}
+                  >
                     Share on Linkedin
                   </Button>
-                  <Button onClick={() => handleShare("copy")}>Copy Link</Button>
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generateSharedLink());
+                      showSuccessToast("Link copied to clipboard!");
+                      handleShare("copy");
+                    }}
+                  >
+                    Copy Link
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
           <div className="flex space-x-4 ml-2 text-sm text-gray-500 dark:text-gray-400">
-            <Button variant="ghost" size="sm">
-              2 likes
+            <Button variant="ghost" size="sm" onClick={handleLikeToggle}>
+              {likeCount} {likeCount === 1 ? "like" : "likes"}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowComments(!showComments)}
             >
-              2 Comments
+              {commentCount} {commentCount === 1 ? "comment" : "comments"}
             </Button>
-            <Button variant="ghost" size="sm">
-              1 share
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsShareDialogOpen(true)}
+            >
+              {shareCount} {shareCount === 1 ? "share" : "shares"}
             </Button>
           </div>
         </div>
@@ -174,17 +304,34 @@ const VideoCard = ({ post }) => {
               </ScrollArea>
               <div className="flex items-center mt-4 p-2">
                 <Avatar className="h-10 w-10 rounded mr-3">
-                  <AvatarImage />
+                  <AvatarImage src={user?.profilePicture} />
                   <AvatarFallback className="dark:bg-gray-400">
-                    ID
+                    {user?.username?.substring(0, 2).toUpperCase() || "ID"}
                   </AvatarFallback>
                 </Avatar>
                 <Input
+                  ref={commentInputRef}
                   className="flex-1 mr-2 dark:border-gray-400"
                   placeholder="Write a comment..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  disabled={isSubmitting}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAddComment();
+                    }
+                  }}
                 />
-                <Button>
-                  <Send className="h-4 w-4" />
+                <Button
+                  onClick={handleAddComment}
+                  disabled={!commentText.trim() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </motion.div>

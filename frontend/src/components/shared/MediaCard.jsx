@@ -1,26 +1,30 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns";
 import {
-  MoreHorizontal,
-  ThumbsUp,
+  Clock,
   MessageCircle,
   Share2,
+  ThumbsUp,
+  Send,
+  MoreHorizontal,
   Trash2,
   Edit,
 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   showSuccessToast,
   showErrorToast,
   showInfoToast,
 } from "@/lib/toastUtils";
+
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -36,14 +40,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import PostComments from "./PostComments";
-import EditPostForm from "./EditPostForm";
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
+import MediaComments from "./MediaComments";
 
-const PostCard = ({ post }) => {
+const MediaCard = ({
+  post,
+  isVideoFeed = false,
+  customHandlers = null,
+  initialLiked = false,
+}) => {
   const { user } = userStore();
-  const { likePost, unlikePost, deletePost } = usePostStore();
+  const { likePost, unlikePost, deletePost, sharePost } = usePostStore();
   const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
@@ -52,10 +60,15 @@ const PostCard = ({ post }) => {
   const [commentCount, setCommentCount] = useState(post?.commentCount || 0);
   const [shareCount, setShareCount] = useState(post?.shareCount || 0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const commentInputRef = useRef(null);
 
   useEffect(() => {
-    // Check if the current user has liked this post
-    if (post?.likes && user?._id) {
+    // If initialLiked is provided, use it; otherwise check post likes
+    if (initialLiked !== undefined) {
+      setIsLiked(initialLiked);
+    } else if (post?.likes && user?._id) {
       setIsLiked(post.likes.includes(user._id));
     }
 
@@ -63,19 +76,36 @@ const PostCard = ({ post }) => {
     setLikeCount(post?.likeCount || 0);
     setCommentCount(post?.commentCount || 0);
     setShareCount(post?.shareCount || 0);
-  }, [post, user]);
+  }, [
+    post,
+    user,
+    initialLiked,
+    post?.likeCount,
+    post?.commentCount,
+    post?.shareCount,
+  ]);
 
   const handleLikeToggle = async () => {
     try {
+      // If custom handler is provided, use it
+      if (customHandlers?.handleLikeToggle) {
+        customHandlers.handleLikeToggle();
+        // Update UI state
+        setIsLiked(!isLiked);
+        setLikeCount((prev) => (isLiked ? Math.max(0, prev - 1) : prev + 1));
+        return;
+      }
+
+      // Default behavior
       if (isLiked) {
         await unlikePost(post._id);
         setIsLiked(false);
-        setLikeCount((prev) => Math.max(0, prev - 1));
+        // Don't update likeCount here, it will be updated by the store
         showInfoToast("Post unliked");
       } else {
         await likePost(post._id);
         setIsLiked(true);
-        setLikeCount((prev) => prev + 1);
+        // Don't update likeCount here, it will be updated by the store
         showSuccessToast("Post liked");
       }
     } catch (error) {
@@ -97,14 +127,77 @@ const PostCard = ({ post }) => {
     }
   };
 
+  const handleAddComment = async () => {
+    if (!commentText.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      // If custom handler is provided, use it
+      if (customHandlers?.handleAddComment) {
+        await customHandlers.handleAddComment(commentText);
+
+        // Clear the input
+        setCommentText("");
+
+        if (commentInputRef.current) {
+          commentInputRef.current.focus();
+        }
+        showSuccessToast("Comment added");
+        return;
+      }
+
+      // Default behavior
+      const postStore = usePostStore.getState();
+      const newComment = await postStore.addComment(post._id, commentText);
+
+      // Update the local post object with the new comment
+      if (!post.comments) {
+        post.comments = [];
+      }
+
+      post.comments = [newComment, ...post.comments];
+      // Don't update the comment count here, it will be updated by the store
+
+      // Clear the input
+      setCommentText("");
+
+      // Focus back on the input for easy commenting
+      if (commentInputRef.current) {
+        commentInputRef.current.focus();
+      }
+
+      showSuccessToast("Comment added successfully");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      showErrorToast("Failed to add comment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const generateSharedLink = () => {
     return `${
       process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin
     }/posts/${post?._id}`;
   };
 
-  const handleShare = (platform) => {
-    showSuccessToast(`Post shared on ${platform}`);
+  const handleShare = async (platform) => {
+    try {
+      // If custom handler is provided, use it
+      if (customHandlers?.handleShare) {
+        customHandlers.handleShare(platform);
+        showSuccessToast(`Post shared on ${platform}`);
+      } else {
+        // Default behavior - call the sharePost function
+        await sharePost(post._id);
+        showSuccessToast(`Post shared on ${platform}`);
+      }
+
+      // Don't update the share count here, it will be updated by the store
+    } catch (error) {
+      console.error("Error sharing post:", error);
+      showErrorToast("Failed to share post");
+    }
   };
 
   const formatDate = (dateString) => {
@@ -125,23 +218,34 @@ const PostCard = ({ post }) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <Card>
+      <Card
+        className={
+          isVideoFeed
+            ? "bg-white dark:bg-[rgb(36,37,38)] rounded-lg shadow-lg overflow-hidden mb-4"
+            : ""
+        }
+      >
         <CardContent className="p-6 dark:text-white">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3 cursor-pointer">
               <Avatar>
                 <AvatarImage src={post?.user?.profilePicture} />
                 <AvatarFallback className="dark:bg-gray-400">
-                  {post?.user?.username?.charAt(0) || "U"}
+                  {post?.user?.username?.substring(0, 2).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <p className="font-semibold dark:text-white">
-                  {post?.user?.username || "User"}
+                  {post?.user?.username || "Unknown User"}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {formatDate(post?.createdAt)}
-                </p>
+                <div className="flex items-center text-gray-500 dark:text-gray-400">
+                  <Clock className="h-4 w-4 mr-1" />
+                  <span className="text-sm">
+                    {post?.createdAt
+                      ? format(new Date(post.createdAt), "MMM dd, yyyy")
+                      : "Unknown date"}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -172,7 +276,11 @@ const PostCard = ({ post }) => {
             )}
           </div>
 
-          <p className="mb-4">{post?.content}</p>
+          {post?.content && (
+            <p className="mb-4 text-gray-800 dark:text-gray-200">
+              {post?.content}
+            </p>
+          )}
 
           {post?.mediaUrl && (
             <div className="relative rounded-lg overflow-hidden mb-4 bg-gray-100 dark:bg-gray-800">
@@ -327,23 +435,56 @@ const PostCard = ({ post }) => {
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <PostComments post={post} />
+                <div className="mt-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.profilePicture} />
+                      <AvatarFallback className="dark:bg-gray-400">
+                        {user?.username?.substring(0, 2).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="relative flex-grow">
+                      <Input
+                        ref={commentInputRef}
+                        placeholder="Write a comment..."
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        disabled={isSubmitting}
+                        className="pr-10 dark:border-gray-400"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddComment();
+                          }
+                        }}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 hover:bg-transparent"
+                        onClick={handleAddComment}
+                        disabled={!commentText.trim() || isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        ) : (
+                          <Send className="h-5 w-5 text-blue-500" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <ScrollArea className="h-[300px] pr-4">
+                    <MediaComments comments={post?.comments} />
+                  </ScrollArea>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
         </CardContent>
       </Card>
-
-      {/* Edit Post Form */}
-      {isEditFormOpen && (
-        <EditPostForm
-          isOpen={isEditFormOpen}
-          onClose={() => setIsEditFormOpen(false)}
-          post={post}
-        />
-      )}
     </motion.div>
   );
 };
 
-export default PostCard;
+export default MediaCard;
