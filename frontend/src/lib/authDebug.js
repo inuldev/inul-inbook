@@ -2,7 +2,7 @@
  * Utility functions for debugging authentication issues
  */
 
-import { getAllCookies } from './cookieUtils';
+import { getAllCookies } from "./cookieUtils";
 
 /**
  * Log detailed authentication information for debugging
@@ -12,43 +12,44 @@ import { getAllCookies } from './cookieUtils';
 export function logAuthDebugInfo(source, additionalInfo = {}) {
   try {
     console.group(`Auth Debug Info (${source})`);
-    
+
     // Log basic environment info
-    console.log('Environment:', process.env.NODE_ENV);
-    console.log('Backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
-    console.log('Current URL:', window.location.href);
-    console.log('Origin:', window.location.origin);
-    console.log('Referrer:', document.referrer);
-    
+    console.log("Environment:", process.env.NODE_ENV);
+    console.log("Backend URL:", process.env.NEXT_PUBLIC_BACKEND_URL);
+    console.log("Current URL:", window.location.href);
+    console.log("Origin:", window.location.origin);
+    console.log("Referrer:", document.referrer);
+
     // Log cookies
-    console.log('Cookies:', getAllCookies());
-    
+    console.log("Cookies:", getAllCookies());
+
     // Log session storage items related to auth
     const sessionItems = {};
     const authKeys = [
-      'loginRedirectUrl', 
-      'frontendUrl', 
-      'googleAuthTimestamp',
-      'authError'
+      "loginRedirectUrl",
+      "frontendUrl",
+      "googleAuthTimestamp",
+      "googleAuthState",
+      "authError",
     ];
-    
-    authKeys.forEach(key => {
+
+    authKeys.forEach((key) => {
       const value = sessionStorage.getItem(key);
       if (value) {
         sessionItems[key] = value;
       }
     });
-    
-    console.log('Session Storage:', sessionItems);
-    
+
+    console.log("Session Storage:", sessionItems);
+
     // Log additional info
     if (Object.keys(additionalInfo).length > 0) {
-      console.log('Additional Info:', additionalInfo);
+      console.log("Additional Info:", additionalInfo);
     }
-    
+
     console.groupEnd();
   } catch (error) {
-    console.error('Error logging auth debug info:', error);
+    console.error("Error logging auth debug info:", error);
   }
 }
 
@@ -62,13 +63,13 @@ export function storeAuthError(errorMessage, errorDetails = {}) {
     const errorInfo = {
       message: errorMessage,
       timestamp: new Date().toISOString(),
-      ...errorDetails
+      ...errorDetails,
     };
-    
-    sessionStorage.setItem('authError', JSON.stringify(errorInfo));
-    console.error('Auth error stored:', errorInfo);
+
+    sessionStorage.setItem("authError", JSON.stringify(errorInfo));
+    console.error("Auth error stored:", errorInfo);
   } catch (error) {
-    console.error('Error storing auth error:', error);
+    console.error("Error storing auth error:", error);
   }
 }
 
@@ -78,12 +79,12 @@ export function storeAuthError(errorMessage, errorDetails = {}) {
  */
 export function getStoredAuthError() {
   try {
-    const errorJson = sessionStorage.getItem('authError');
+    const errorJson = sessionStorage.getItem("authError");
     if (!errorJson) return null;
-    
+
     return JSON.parse(errorJson);
   } catch (error) {
-    console.error('Error retrieving stored auth error:', error);
+    console.error("Error retrieving stored auth error:", error);
     return null;
   }
 }
@@ -93,8 +94,8 @@ export function getStoredAuthError() {
  */
 export function clearStoredAuthError() {
   try {
-    sessionStorage.removeItem('authError');
+    sessionStorage.removeItem("authError");
   } catch (error) {
-    console.error('Error clearing stored auth error:', error);
+    console.error("Error clearing stored auth error:", error);
   }
 }

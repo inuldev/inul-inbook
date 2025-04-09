@@ -11,7 +11,7 @@ const protect = async (req, res, next) => {
     console.log("Authorization header:", req.headers.authorization);
     console.log("Request origin:", req.headers.origin);
     console.log("Request host:", req.headers.host);
-    console.log("Request referer:", req.headers.referer);
+    console.log("Request referrer:", req.headers.referrer);
     console.log("Is production:", process.env.NODE_ENV === "production");
     console.log("Frontend URL:", process.env.FRONTEND_URL);
 
