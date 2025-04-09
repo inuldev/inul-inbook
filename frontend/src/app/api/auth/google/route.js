@@ -50,8 +50,7 @@ export async function GET(request) {
         source: "next-api-route",
         path: request.url,
         origin: request.headers.get("origin") || new URL(request.url).origin,
-        referrer:
-          request.headers.get("referrer") || new URL(request.url).origin,
+        referer: request.headers.get("referer") || new URL(request.url).origin, // referer is the correct spelling
       })
     ).toString("base64");
 

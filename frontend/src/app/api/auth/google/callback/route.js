@@ -52,10 +52,10 @@ export async function GET(request) {
         "X-Forwarded-For": request.headers.get("x-forwarded-for") || "",
         "X-Real-IP": request.headers.get("x-real-ip") || "",
         "User-Agent": request.headers.get("user-agent") || "",
-        // Add origin and referrer headers to help with CORS
+        // Add origin and referer headers to help with CORS
         Origin: request.headers.get("origin") || new URL(request.url).origin,
-        Referrer:
-          request.headers.get("referrer") || new URL(request.url).origin,
+        Referer:
+          request.headers.get("referer") || new URL(request.url).origin, // referer is the correct spelling
       },
       redirect: "manual", // Don't follow redirects automatically
       // Increase timeout for potentially slow responses

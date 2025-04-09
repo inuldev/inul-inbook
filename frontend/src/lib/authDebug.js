@@ -18,7 +18,7 @@ export function logAuthDebugInfo(source, additionalInfo = {}) {
     console.log("Backend URL:", process.env.NEXT_PUBLIC_BACKEND_URL);
     console.log("Current URL:", window.location.href);
     console.log("Origin:", window.location.origin);
-    console.log("Referrer:", document.referrer);
+    console.log("Referer:", document.referer); // referer is the correct spelling
 
     // Log cookies
     console.log("Cookies:", getAllCookies());

@@ -44,7 +44,7 @@ export function useGoogleAuth() {
           timestamp: Date.now(),
           userAgent: navigator.userAgent,
           url: window.location.href,
-          referrer: document.referrer,
+          referer: document.referer, // referer is the correct spelling
           cookies: document.cookie ? "present" : "none",
           localStorage: localStorage.length > 0 ? "present" : "none",
           origin: window.location.origin,
@@ -69,7 +69,7 @@ export function useGoogleAuth() {
         timestamp: Date.now(),
         origin: window.location.origin,
         path: window.location.pathname,
-        referrer: document.referrer,
+        referer: document.referer, // referer is the correct spelling
       };
 
       // Store state in sessionStorage for verification on callback
