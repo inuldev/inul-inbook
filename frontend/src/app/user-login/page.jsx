@@ -34,6 +34,16 @@ export default function LoginPage() {
   const [formError, setFormError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
 
+  // Clear errors when user changes input
+  const handleInputChange = (e, setter) => {
+    // Clear any form errors when user starts typing
+    if (formError) setFormError("");
+    if (error) clearErrors();
+
+    // Update the input value
+    setter(e.target.value);
+  };
+
   // Check for auth errors on page load
   useEffect(() => {
     // Check for error parameter in URL
@@ -105,11 +115,7 @@ export default function LoginPage() {
   };
 
   // Get the Google auth hook
-  const {
-    initiateGoogleLogin,
-    loading: googleLoading,
-    error: googleError,
-  } = useGoogleAuth();
+  const { initiateGoogleLogin, error: googleError } = useGoogleAuth();
 
   const handleGoogleLogin = () => {
     // Clear any existing errors
@@ -155,7 +161,7 @@ export default function LoginPage() {
                 type="email"
                 placeholder="name@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => handleInputChange(e, setEmail)}
                 disabled={loading}
                 required
               />
@@ -176,7 +182,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handleInputChange(e, setPassword)}
                   disabled={loading}
                   required
                 />

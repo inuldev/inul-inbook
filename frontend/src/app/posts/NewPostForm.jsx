@@ -132,30 +132,6 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                   readOnly
                   className="cursor-pointer rounded-full h-12 dark:bg-[rgb(58,59,60)] placeholder:text-gray-500 dark:placeholder:text-gray-400 w-full"
                 />
-                {/* <Separator className="my-2 dark:bg-slate-400" />
-                <div className="flex justify-between">
-                  <Button
-                    variant="ghost"
-                    className="flex items-center justify-center"
-                  >
-                    <ImageIcon className="h-5 w-5 text-green-500 mr-2" />
-                    <span className="dark:text-slate-100">Photo</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center justify-center"
-                  >
-                    <Video className="h-5 w-5 text-red-500 mr-2" />
-                    <span className="dark:text-slate-100">Video</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center justify-center"
-                  >
-                    <Laugh className="h-5 w-5 text-orange-500 mr-2" />
-                    <span className="dark:text-slate-100">Feelings</span>
-                  </Button>
-                </div> */}
               </div>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[525px] max-h-[80vh] overflow-y-auto">
@@ -203,7 +179,7 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                 </div>
               )}
 
-              {!showMediaUploader && !mediaData && (
+              {/* {!showMediaUploader && !mediaData && (
                 <Button
                   variant="outline"
                   className="mt-4 w-full"
@@ -212,7 +188,7 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                   <Plus className="mr-2 h-4 w-4" />
                   Add Photos/Videos
                 </Button>
-              )}
+              )} */}
 
               {showMediaUploader && !mediaData && (
                 <div className="mt-4">

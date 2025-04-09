@@ -42,8 +42,29 @@ export default function RegisterPage() {
   const [gender, setGender] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
+
+  // Clear errors when user changes input
+  const handleInputChange = (e, setter) => {
+    // Clear any form errors when user starts typing
+    if (formError) setFormError("");
+    if (error) clearErrors();
+
+    // Update the input value
+    setter(e.target.value);
+  };
+
+  // Special handler for select components
+  const handleSelectChange = (value, setter) => {
+    // Clear any form errors when user makes a selection
+    if (formError) setFormError("");
+    if (error) clearErrors();
+
+    // Update the select value
+    setter(value);
+  };
 
   // Check for auth errors on page load
   useEffect(() => {
@@ -112,11 +133,7 @@ export default function RegisterPage() {
   };
 
   // Get the Google auth hook
-  const {
-    initiateGoogleLogin,
-    loading: googleLoading,
-    error: googleError,
-  } = useGoogleAuth();
+  const { initiateGoogleLogin, error: googleError } = useGoogleAuth();
 
   const handleGoogleLogin = () => {
     // Clear any existing errors
@@ -163,7 +180,7 @@ export default function RegisterPage() {
                 id="username"
                 placeholder="johndoe"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => handleInputChange(e, setUsername)}
                 disabled={loading}
                 required
               />
@@ -175,7 +192,7 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="name@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => handleInputChange(e, setEmail)}
                 disabled={loading}
                 required
               />
@@ -188,7 +205,7 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handleInputChange(e, setPassword)}
                   disabled={loading}
                   required
                 />
@@ -209,22 +226,39 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={loading}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => handleInputChange(e, setConfirmPassword)}
+                  disabled={loading}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-gray-500" />
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
                 <Select
                   value={gender}
-                  onValueChange={setGender}
+                  onValueChange={(value) =>
+                    handleSelectChange(value, setGender)
+                  }
                   disabled={loading}
                 >
                   <SelectTrigger id="gender">
@@ -243,7 +277,7 @@ export default function RegisterPage() {
                   id="dateOfBirth"
                   type="date"
                   value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  onChange={(e) => handleInputChange(e, setDateOfBirth)}
                   disabled={loading}
                   required
                 />

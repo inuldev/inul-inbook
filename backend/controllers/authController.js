@@ -63,15 +63,11 @@ const register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
+    // Create user - the password will be hashed by the pre-save middleware
     const user = await User.create({
       username,
       email,
-      password: hashedPassword,
+      password, // The User model's pre-save middleware will hash this
       gender,
       dateOfBirth,
     });
@@ -105,7 +101,25 @@ const login = async (req, res) => {
 
     // Find user and verify password
     const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
+
+    // Add debugging
+    console.log(`Login attempt for email: ${email}`);
+    console.log(`User found: ${user ? "Yes" : "No"}`);
+
+    if (!user) {
+      console.log("Login failed: User not found");
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    // Check password match
+    const isMatch = await user.matchPassword(password);
+    console.log(`Password match: ${isMatch ? "Yes" : "No"}`);
+
+    if (!isMatch) {
+      console.log("Login failed: Password does not match");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",

@@ -73,7 +73,7 @@ const userStore = create((set) => ({
         setCookie("token", data.token, {
           maxAge: 60 * 60 * 24 * 30, // 30 days
           secure: window.location.protocol === "https:",
-          sameSite: "lax",
+          sameSite: "none",
         });
       }
 
@@ -208,7 +208,7 @@ const userStore = create((set) => ({
 
   logout: async () => {
     try {
-      // Changed from POST to GET to match the backend route definition
+      // Send a request to the backend to clear the session
       const response = await fetch(`${config.backendUrl}/api/auth/logout`, {
         method: "GET",
         credentials: "include",
@@ -225,7 +225,7 @@ const userStore = create((set) => ({
       // Clear both cookies
       deleteCookie("token", {
         secure: window.location.protocol === "https:",
-        sameSite: "lax",
+        sameSite: "none",
       });
       deleteCookie("auth_status", {
         secure: window.location.protocol === "https:",
@@ -282,7 +282,7 @@ const userStore = create((set) => ({
       setCookie("token", data.token, {
         maxAge: 60 * 60 * 24 * 30, // 30 days
         secure: window.location.protocol === "https:",
-        sameSite: "lax",
+        sameSite: "none",
       });
       setCookie("auth_status", "logged_in", {
         maxAge: 60 * 60 * 24 * 30, // 30 days
