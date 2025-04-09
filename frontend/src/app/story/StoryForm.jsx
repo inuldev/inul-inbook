@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -112,6 +113,7 @@ const StoryForm = () => {
       <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center">Create Story</DialogTitle>
+          <DialogDescription className="sr-only"></DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
