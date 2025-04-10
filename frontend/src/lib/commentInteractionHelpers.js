@@ -71,7 +71,12 @@ export const toggleCommentLike = async (
  * @param {Object} user - Current user object
  * @returns {Promise<void>}
  */
-export const deleteComment = async (commentId, postId, onCommentDeleted, user) => {
+export const deleteComment = async (
+  commentId,
+  postId,
+  onCommentDeleted,
+  user
+) => {
   // Check if user is logged in
   if (!user || !user._id) {
     showErrorToast("Please log in to delete comments");
@@ -100,7 +105,7 @@ export const deleteComment = async (commentId, postId, onCommentDeleted, user) =
 
     // Update the post in the store
     const postStore = usePostStore.getState();
-    
+
     // Fetch the updated post to get the latest comments
     const updatedResponse = await fetch(
       `${config.backendUrl}/api/posts/${postId}`,
@@ -119,10 +124,10 @@ export const deleteComment = async (commentId, postId, onCommentDeleted, user) =
     if (updatedData.success) {
       // Process the updated post
       const processedPost = postStore.processPost(updatedData.data, user);
-      
+
       // Update the post in the store
       postStore.updatePostInStore(processedPost);
-      
+
       // Call the callback function
       if (onCommentDeleted) {
         onCommentDeleted(commentId);
@@ -185,35 +190,100 @@ export const replyToComment = async (
       throw new Error(data.message || "Failed to reply to comment");
     }
 
+    // Get the actual reply data from the server
+    const serverReply = data.data;
+
+    // Create a complete reply object with all necessary fields
+    const newReply = {
+      _id: serverReply._id,
+      text: serverReply.text,
+      user: serverReply.user || {
+        _id: user._id,
+        username: user.username,
+        profilePicture: user.profilePicture,
+      },
+      createdAt: serverReply.createdAt || new Date().toISOString(),
+      parentComment: commentId, // Use the correct field name as in the backend model
+      likes: [],
+      likeCount: 0,
+      replies: [],
+      replyCount: 0,
+    };
+
+    // Log the reply for debugging
+    console.log("Created reply object:", newReply);
+    console.log("Server reply data:", serverReply);
+
     // Update the post in the store
     const postStore = usePostStore.getState();
-    
-    // Fetch the updated post to get the latest comments
-    const updatedResponse = await fetch(
-      `${config.backendUrl}/api/posts/${postId}`,
-      {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
+    const existingPost = postStore.posts.find((p) => p._id === postId);
+
+    if (existingPost && existingPost.comments) {
+      // Find the parent comment
+      const updatedComments = existingPost.comments.map((comment) => {
+        if (comment._id === commentId) {
+          // Add the reply to this comment
+          return {
+            ...comment,
+            replies: comment.replies
+              ? [...comment.replies, newReply]
+              : [newReply],
+            replyCount: (comment.replyCount || 0) + 1,
+          };
+        }
+        return comment;
+      });
+
+      // Update the post with the new comments
+      postStore.updatePostInStore({
+        ...existingPost,
+        comments: updatedComments,
+      });
+    }
+
+    // Also fetch the updated post to ensure we have the latest data
+    try {
+      const updatedResponse = await fetch(
+        `${config.backendUrl}/api/posts/${postId}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: config.apiTimeouts.medium,
+        }
+      );
+
+      const updatedData = await updatedResponse.json();
+
+      if (updatedData.success) {
+        // Process the updated post
+        const processedPost = postStore.processPost(updatedData.data, user);
+
+        // Update the post in the store
+        postStore.updatePostInStore(processedPost);
+      }
+    } catch (fetchError) {
+      console.warn("Error fetching updated post after reply:", fetchError);
+      // Continue even if this fails, as we've already updated the UI
+    }
+
+    // Call the callback function with the new reply
+    if (onReplyAdded) {
+      // Make sure we're passing the complete reply object
+      const completeReply = {
+        _id: data.data._id,
+        text: data.data.text,
+        user: {
+          _id: user._id,
+          username: user.username,
+          profilePicture: user.profilePicture,
         },
-        timeout: config.apiTimeouts.medium,
-      }
-    );
-
-    const updatedData = await updatedResponse.json();
-
-    if (updatedData.success) {
-      // Process the updated post
-      const processedPost = postStore.processPost(updatedData.data, user);
-      
-      // Update the post in the store
-      postStore.updatePostInStore(processedPost);
-      
-      // Call the callback function
-      if (onReplyAdded) {
-        onReplyAdded(data.data);
-      }
+        createdAt: data.data.createdAt || new Date().toISOString(),
+        parentId: commentId,
+      };
+      onReplyAdded(completeReply);
     }
 
     // Show success message

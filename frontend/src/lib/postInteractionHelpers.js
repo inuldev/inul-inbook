@@ -29,28 +29,78 @@ export const togglePostLike = async (
   }
 
   try {
-    // Toggle the like state immediately for better UX
+    // Determine the action based on current UI state
+    const action = isLiked ? "unlike" : "like";
+
+    // Temporarily update UI for better UX
     const newLikedState = !isLiked;
-
-    // Update UI immediately
     setIsLiked(newLikedState);
-    setLikeCount((prev) => (newLikedState ? prev + 1 : Math.max(0, prev - 1)));
+    setLikeCount(
+      newLikedState
+        ? (post.likeCount || 0) + 1
+        : Math.max(0, (post.likeCount || 1) - 1)
+    );
 
-    // Get the post store
-    const postStore = usePostStore.getState();
+    // Make the API call
+    const response = await fetch(
+      `${config.backendUrl}/api/posts/${post._id}/${action}`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: config.apiTimeouts.short,
+      }
+    );
 
-    // Call the appropriate store method
-    if (newLikedState) {
-      await postStore.likePost(post._id);
-      showSuccessToast("Post liked");
+    const data = await response.json();
+
+    // After the API call, get the current state to ensure accuracy
+    const getResponse = await fetch(
+      `${config.backendUrl}/api/posts/${post._id}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: config.apiTimeouts.short,
+      }
+    );
+
+    const getPostData = await getResponse.json();
+
+    if (getPostData.success) {
+      // Get the actual state from the server
+      const serverIsLiked = getPostData.data.likes.includes(user._id);
+      const serverLikeCount = getPostData.data.likeCount || 0;
+
+      // Update UI to match server state
+      setIsLiked(serverIsLiked);
+      setLikeCount(serverLikeCount);
+
+      // Update the post in the store
+      const postStore = usePostStore.getState();
+      postStore.updatePostInStore({
+        ...post,
+        isLiked: serverIsLiked,
+        likeCount: serverLikeCount,
+      });
+
+      // Show appropriate message
+      if (serverIsLiked) {
+        showSuccessToast("Post liked");
+      } else {
+        showInfoToast("Post unliked");
+      }
     } else {
-      await postStore.unlikePost(post._id);
-      showInfoToast("Post unliked");
+      throw new Error("Failed to get updated post state");
     }
   } catch (error) {
     // Revert UI changes on error
     setIsLiked(isLiked);
-    setLikeCount((prev) => (isLiked ? prev : Math.max(0, prev - 1)));
+    setLikeCount(post.likeCount || 0);
     console.error("Error toggling like:", error);
     showErrorToast("Failed to update like status");
   }
@@ -89,21 +139,91 @@ export const addPostComment = async (
 
   try {
     setIsSubmitting(true);
+    const tempCommentText = commentText.trim();
+    setCommentText(""); // Clear input immediately for better UX
 
-    // Get the post store
-    const postStore = usePostStore.getState();
+    // Make the API call directly
+    const response = await fetch(
+      `${config.backendUrl}/api/posts/${postId}/comment`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: tempCommentText }),
+        timeout: config.apiTimeouts.medium,
+      }
+    );
 
-    // Add the comment
-    const newComment = await postStore.addComment(postId, commentText);
+    const data = await response.json();
 
-    // Update UI
-    setComments((prev) => [newComment, ...prev]);
+    if (!data.success) {
+      throw new Error(data.message || "Failed to add comment");
+    }
+
+    // Get the actual comment data from the response
+    // This ensures we're using the server's data structure
+    const serverComment = data.data;
+
+    // Make sure the comment has all required fields
+    const newComment = {
+      _id: serverComment._id,
+      text: serverComment.text,
+      user: serverComment.user || {
+        _id: user._id,
+        username: user.username,
+        profilePicture: user.profilePicture,
+      },
+      createdAt: serverComment.createdAt || new Date().toISOString(),
+      likes: [],
+      likeCount: 0,
+      replies: [],
+      replyCount: 0,
+    };
+
+    // Log the comment for debugging
+    console.log("New comment created:", newComment);
+
+    // Update UI - only add this one comment
+    // First check if the comment already exists to avoid duplicates
+    setComments((prev) => {
+      // Check if comment already exists
+      const exists = prev.some((comment) => comment._id === newComment._id);
+      if (exists) {
+        return prev; // Don't add if it already exists
+      }
+      return [newComment, ...prev];
+    });
+
     setCommentCount((prev) => prev + 1);
-    setCommentText("");
+
+    // Update the post in the store
+    const postStore = usePostStore.getState();
+    const existingPost = postStore.posts.find((p) => p._id === postId);
+
+    if (existingPost) {
+      // Only add the new comment, don't duplicate
+      const updatedComments = [newComment, ...(existingPost.comments || [])];
+
+      // Make sure we don't have duplicates
+      const uniqueComments = updatedComments.filter(
+        (comment, index, self) =>
+          index === self.findIndex((c) => c._id === comment._id)
+      );
+
+      postStore.updatePostInStore({
+        ...existingPost,
+        comments: uniqueComments,
+        commentCount: (existingPost.commentCount || 0) + 1,
+      });
+    }
+
     showSuccessToast("Comment added");
   } catch (error) {
     console.error("Error adding comment:", error);
     showErrorToast("Failed to add comment");
+    setCommentText(commentText); // Restore comment text on error
   } finally {
     setIsSubmitting(false);
   }

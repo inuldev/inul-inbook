@@ -41,6 +41,7 @@ const PostComments = ({ post }) => {
   const [commentLikeCounts, setCommentLikeCounts] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState("");
+  const [expandedReplies, setExpandedReplies] = useState({});
   const replyInputRef = useRef(null);
 
   useEffect(() => {
@@ -87,7 +88,6 @@ const PostComments = ({ post }) => {
       commentText,
       setCommentText,
       (newComment) => setComments((prev) => [newComment, ...prev]),
-      (count) => {}, // We're already updating comments array
       user,
       setIsSubmitting
     );
@@ -105,14 +105,35 @@ const PostComments = ({ post }) => {
         replyingTo,
         post._id,
         tempReplyText,
-        () => {
+        (newReply) => {
           // Close the dialog
           setReplyingTo(null);
 
-          // Refresh comments from the post
-          if (post?.comments) {
-            setComments(post.comments);
-          }
+          // Automatically expand replies for this comment
+          setExpandedReplies((prev) => ({
+            ...prev,
+            [replyingTo]: true,
+          }));
+
+          // Log the reply for debugging
+          console.log("New reply added:", newReply);
+
+          // Update the comments in the local state
+          setComments((prevComments) => {
+            return prevComments.map((comment) => {
+              if (comment._id === replyingTo) {
+                // Add the reply to this comment
+                return {
+                  ...comment,
+                  replies: comment.replies
+                    ? [...comment.replies, newReply]
+                    : [newReply],
+                  replyCount: (comment.replyCount || 0) + 1,
+                };
+              }
+              return comment;
+            });
+          });
         },
         user
       );
@@ -177,86 +198,175 @@ const PostComments = ({ post }) => {
       {comments?.length > 0 ? (
         <div className="max-h-60 overflow-y-auto pr-2">
           {visibleComments?.map((comment) => (
-            <div key={comment?._id} className="flex items-start space-x-2 mb-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={comment?.user?.profilePicture} />
-                <AvatarFallback className="dark:bg-gray-400">
-                  {comment?.user?.username?.charAt(0) || "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col flex-grow">
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
-                  <p className="font-bold text-sm">
-                    {comment?.user?.username || "User"}
-                  </p>
-                  <p className="text-sm">{comment?.text}</p>
-                </div>
-                <div className="flex items-center text-xs text-gray-500 mt-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={`h-6 px-2 ${
-                      commentLikes[comment?._id] ? "text-blue-500" : ""
-                    }`}
-                    onClick={() =>
-                      toggleCommentLike(
-                        comment._id,
-                        commentLikes[comment._id] || false,
-                        (newState) =>
-                          setCommentLikes((prev) => ({
-                            ...prev,
-                            [comment._id]: newState,
-                          })),
-                        (updater) =>
-                          setCommentLikeCounts((prev) => ({
-                            ...prev,
-                            [comment._id]: updater(prev[comment._id] || 0),
-                          })),
-                        user
-                      )
-                    }
-                  >
-                    <ThumbsUp
-                      className={`h-3 w-3 mr-1 ${
-                        commentLikes[comment?._id] ? "fill-blue-500" : ""
-                      }`}
-                    />
-                    {commentLikeCounts[comment?._id] || 0}{" "}
-                    {commentLikes[comment?._id] ? "Liked" : "Like"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2"
-                    onClick={() => setReplyingTo(comment._id)}
-                  >
-                    <Reply className="h-3 w-3 mr-1" /> Reply
-                  </Button>
-                  {user?._id === comment?.user?._id && (
+            <div key={comment?._id} className="flex flex-col space-y-2 mb-4">
+              {/* Main Comment */}
+              <div className="flex items-start space-x-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={comment?.user?.profilePicture} />
+                  <AvatarFallback className="dark:bg-gray-400">
+                    {comment?.user?.username?.charAt(0) || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col flex-grow">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
+                    <p className="font-bold text-sm">
+                      {comment?.user?.username || "User"}
+                    </p>
+                    <p className="text-sm">{comment?.text}</p>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-500 mt-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-red-500"
+                      className={`h-6 px-2 ${
+                        commentLikes[comment?._id] ? "text-blue-500" : ""
+                      }`}
                       onClick={() =>
-                        deleteComment(
+                        toggleCommentLike(
                           comment._id,
-                          post._id,
-                          (deletedCommentId) => {
-                            // Remove the deleted comment from the local state
-                            setComments((prev) =>
-                              prev.filter((c) => c._id !== deletedCommentId)
-                            );
-                          },
+                          commentLikes[comment._id] || false,
+                          (newState) =>
+                            setCommentLikes((prev) => ({
+                              ...prev,
+                              [comment._id]: newState,
+                            })),
+                          (updater) =>
+                            setCommentLikeCounts((prev) => ({
+                              ...prev,
+                              [comment._id]: updater(prev[comment._id] || 0),
+                            })),
                           user
                         )
                       }
                     >
-                      <Trash2 className="h-3 w-3 mr-1" /> Delete
+                      <ThumbsUp
+                        className={`h-3 w-3 mr-1 ${
+                          commentLikes[comment?._id] ? "fill-blue-500" : ""
+                        }`}
+                      />
+                      {commentLikeCounts[comment?._id] || 0}{" "}
+                      {commentLikes[comment?._id] ? "Liked" : "Like"}
                     </Button>
-                  )}
-                  <span className="ml-2">{formatDate(comment?.createdAt)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2"
+                      onClick={() => setReplyingTo(comment._id)}
+                    >
+                      <Reply className="h-3 w-3 mr-1" /> Reply
+                    </Button>
+                    {user?._id === comment?.user?._id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-red-500"
+                        onClick={() =>
+                          deleteComment(
+                            comment._id,
+                            post._id,
+                            (deletedCommentId) => {
+                              // Remove the deleted comment from the local state
+                              setComments((prev) =>
+                                prev.filter((c) => c._id !== deletedCommentId)
+                              );
+                            },
+                            user
+                          )
+                        }
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" /> Delete
+                      </Button>
+                    )}
+                    <span className="ml-2">
+                      {formatDate(comment?.createdAt)}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Replies Section */}
+              {comment.replies && comment.replies.length > 0 && (
+                <div className="ml-10">
+                  {/* Toggle Replies Button */}
+                  {comment.replies.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs mb-1 h-6 px-2"
+                      onClick={() =>
+                        setExpandedReplies((prev) => ({
+                          ...prev,
+                          [comment._id]: !prev[comment._id],
+                        }))
+                      }
+                    >
+                      {expandedReplies[comment._id] ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 mr-1" /> Hide{" "}
+                          {comment.replies.length}{" "}
+                          {comment.replies.length === 1 ? "reply" : "replies"}
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 mr-1" /> View{" "}
+                          {comment.replies.length}{" "}
+                          {comment.replies.length === 1 ? "reply" : "replies"}
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Replies List */}
+                  {expandedReplies[comment._id] &&
+                    comment.replies.map((reply) => (
+                      <div
+                        key={reply._id}
+                        className="flex items-start space-x-2 mb-2 mt-1"
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={reply?.user?.profilePicture} />
+                          <AvatarFallback className="dark:bg-gray-400 text-xs">
+                            {reply?.user?.username
+                              ?.substring(0, 2)
+                              .toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col flex-grow">
+                          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
+                            <p className="font-bold text-xs">
+                              {reply?.user?.username || "User"}
+                            </p>
+                            <p className="text-xs">{reply?.text}</p>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-500 mt-1">
+                            <span className="text-xs text-gray-400">
+                              {formatDate(reply?.createdAt)}
+                            </span>
+                            {user?._id === reply?.user?._id && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-1 ml-2 text-red-500"
+                                onClick={() =>
+                                  deleteComment(
+                                    reply._id,
+                                    post._id,
+                                    () => {
+                                      // This will be handled by the store update
+                                    },
+                                    user
+                                  )
+                                }
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           ))}
 

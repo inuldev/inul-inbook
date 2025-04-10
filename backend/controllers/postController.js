@@ -183,10 +183,19 @@ const getPost = async (req, res) => {
       })
       .populate({
         path: "comments",
-        populate: {
-          path: "user",
-          select: "username profilePicture",
-        },
+        populate: [
+          {
+            path: "user",
+            select: "username profilePicture",
+          },
+          {
+            path: "replies",
+            populate: {
+              path: "user",
+              select: "username profilePicture",
+            },
+          },
+        ],
       });
 
     if (!post) {

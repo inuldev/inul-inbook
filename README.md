@@ -18,7 +18,7 @@ To get started with the project, follow these steps:
 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/social-media-app.git
+git clone https://github.com/inuldev/inul-inbook.git
 cd social-media-app
 ```
 
@@ -107,6 +107,9 @@ Make sure you have the following environment variables set up:
 PORT=8000
 MONGO_URI=your_mongodb_url
 JWT_SECRET=your_random_secret
+SESSION_SECRET=your_random_secret
+LOG_LEVEL=error
+JWT_EXPIRES_IN=30d
 CLOUDINARY_NAME=your_cloudinary_name
 CLOUDINARY_API_KEY=your_cloudinary_key
 CLOUDINARY_API_SECRET=your_cloudinary_secret
@@ -123,6 +126,7 @@ NODE_ENV=development_or_production
 NEXT_PUBLIC_BACKEND_URL=your_backend_url
 NEXT_PUBLIC_FRONTEND_URL=your_frontend_url
 NODE_ENV=development_or_production
+NEXT_PUBLIC_APP_ENV=development_or_production
 ```
 
 ### Cloudinary Setup
