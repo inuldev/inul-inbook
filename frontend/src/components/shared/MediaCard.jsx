@@ -11,13 +11,9 @@ import {
   Send,
   MoreHorizontal,
   Trash2,
-  Edit,
+  // Edit, // Will be used in the future
 } from "lucide-react";
-import {
-  showSuccessToast,
-  showErrorToast,
-  showInfoToast,
-} from "@/lib/toastUtils";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,6 +39,7 @@ import {
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
 import MediaComments from "./MediaComments";
+import config from "@/lib/config";
 
 const MediaCard = ({
   post,
@@ -51,10 +48,11 @@ const MediaCard = ({
   initialLiked = false,
 }) => {
   const { user } = userStore();
-  const { likePost, unlikePost, deletePost, sharePost } = usePostStore();
+  const { deletePost } = usePostStore();
   const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  // We'll implement edit functionality in the future
+  // const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likeCount || 0);
   const [commentCount, setCommentCount] = useState(post?.commentCount || 0);
@@ -64,53 +62,194 @@ const MediaCard = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const commentInputRef = useRef(null);
 
+  // Fetch fresh post data when component mounts
   useEffect(() => {
-    // If initialLiked is provided, use it; otherwise check post likes
-    if (initialLiked !== undefined) {
-      setIsLiked(initialLiked);
-    } else if (post?.likes && user?._id) {
-      setIsLiked(post.likes.includes(user._id));
+    if (post?._id && user?._id) {
+      // Using an IIFE to avoid dependency issues
+      (async () => {
+        try {
+          // Fetch the latest post data
+          const response = await fetch(
+            `${config.backendUrl}/api/posts/${post._id}`,
+            {
+              method: "GET",
+              credentials: "include",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success) {
+            const freshPost = data.data;
+
+            // Check if the current user has liked this post
+            let userLiked = false;
+
+            if (Array.isArray(freshPost.likes)) {
+              userLiked = freshPost.likes.some((like) => {
+                if (typeof like === "string") {
+                  return like === user._id;
+                } else if (like && typeof like === "object") {
+                  return like._id === user._id;
+                }
+                return false;
+              });
+            }
+
+            // Update local state
+            setLikeCount(freshPost.likeCount || 0);
+            setCommentCount(freshPost.commentCount || 0);
+            setShareCount(freshPost.shareCount || 0);
+            setIsLiked(userLiked);
+
+            // Update the post in the store
+            const postStore = usePostStore.getState();
+            postStore.updatePostInStore({
+              ...freshPost,
+              isLiked: userLiked,
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching post data:", error);
+        }
+      })();
+    }
+  }, [post?._id, user?._id]);
+
+  useEffect(() => {
+    if (!post) return;
+
+    // Update counts from post data with safe defaults
+    setLikeCount(post.likeCount || 0);
+    setCommentCount(post.commentCount || 0);
+    setShareCount(post.shareCount || 0);
+
+    // If no user is logged in, we can't determine like state
+    if (!user || !user._id) {
+      setIsLiked(false);
+      return;
     }
 
-    // Update counts from post data
-    setLikeCount(post?.likeCount || 0);
-    setCommentCount(post?.commentCount || 0);
-    setShareCount(post?.shareCount || 0);
+    // Handle like state
+    if (initialLiked !== undefined) {
+      // If initialLiked prop is provided, use it (for custom implementations)
+      setIsLiked(initialLiked);
+    } else if (post.isLiked !== undefined) {
+      // If the post has an isLiked property (from the store), use it
+      setIsLiked(post.isLiked);
+    } else if (Array.isArray(post.likes)) {
+      // Check if the current user has liked this post
+      const userLiked = post.likes.some((like) => {
+        if (typeof like === "string") {
+          return like === user._id;
+        } else if (like && typeof like === "object") {
+          return like._id === user._id;
+        }
+        return false;
+      });
+
+      // Set the like state
+      setIsLiked(userLiked);
+
+      // Update the post in the store with the correct like status
+      const postStore = usePostStore.getState();
+      postStore.updatePostInStore({
+        ...post,
+        isLiked: userLiked,
+      });
+    } else {
+      // Default to not liked if no likes array exists
+      setIsLiked(false);
+    }
   }, [
+    // Dependencies
     post,
     user,
     initialLiked,
+    // These specific properties trigger updates when they change
+    post?._id,
+    post?.likes,
+    post?.isLiked,
     post?.likeCount,
     post?.commentCount,
     post?.shareCount,
+    user?._id,
   ]);
 
   const handleLikeToggle = async () => {
-    try {
-      // If custom handler is provided, use it
-      if (customHandlers?.handleLikeToggle) {
-        customHandlers.handleLikeToggle();
-        // Update UI state
-        setIsLiked(!isLiked);
-        setLikeCount((prev) => (isLiked ? Math.max(0, prev - 1) : prev + 1));
-        return;
-      }
+    // Check if user is logged in
+    if (!user || !user._id) {
+      showErrorToast("Please log in to like posts");
+      return;
+    }
 
-      // Default behavior
-      if (isLiked) {
-        await unlikePost(post._id);
-        setIsLiked(false);
-        // Don't update likeCount here, it will be updated by the store
-        showInfoToast("Post unliked");
+    // If custom handler is provided, use it
+    if (customHandlers?.handleLikeToggle) {
+      customHandlers.handleLikeToggle();
+      setIsLiked(!isLiked);
+      setLikeCount((prev) => (isLiked ? Math.max(0, prev - 1) : prev + 1));
+      return;
+    }
+
+    try {
+      // Toggle the like state immediately for better UX
+      const newLikedState = !isLiked;
+
+      // Update UI immediately
+      setIsLiked(newLikedState);
+      setLikeCount((prev) =>
+        newLikedState ? prev + 1 : Math.max(0, prev - 1)
+      );
+
+      // Make the API call
+      const endpoint = newLikedState ? "like" : "unlike";
+      const response = await fetch(
+        `${config.backendUrl}/api/posts/${post._id}/${endpoint}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (
+        data.success ||
+        (newLikedState && data.message === "Post already liked") ||
+        (!newLikedState && data.message === "Post not liked")
+      ) {
+        // Success - show toast
+        showSuccessToast(newLikedState ? "Post liked" : "Post unliked");
+
+        // Update the post in the global store
+        const postStore = usePostStore.getState();
+        postStore.updatePostInStore({
+          ...post,
+          isLiked: newLikedState,
+          likeCount: newLikedState
+            ? post.likeCount + 1
+            : Math.max(0, post.likeCount - 1),
+        });
       } else {
-        await likePost(post._id);
-        setIsLiked(true);
-        // Don't update likeCount here, it will be updated by the store
-        showSuccessToast("Post liked");
+        // API call failed - revert UI changes
+        setIsLiked(!newLikedState);
+        setLikeCount((prev) =>
+          !newLikedState ? prev + 1 : Math.max(0, prev - 1)
+        );
+        showErrorToast("Failed to update like status");
       }
     } catch (error) {
-      console.error("Error toggling like:", error);
-      showErrorToast("Failed to update like status");
+      // Error - revert UI changes
+      setIsLiked(!isLiked);
+      setLikeCount((prev) => (isLiked ? prev + 1 : Math.max(0, prev - 1)));
+      console.error("Error in like toggle:", error);
+      showErrorToast("An unexpected error occurred");
     }
   };
 
@@ -118,7 +257,7 @@ const MediaCard = ({
     try {
       setIsDeleting(true);
       await deletePost(post._id);
-      showSuccessToast("Post deleted successfully");
+      showSuccessToast("Post deleted");
     } catch (error) {
       console.error("Error deleting post:", error);
       showErrorToast("Failed to delete post");
@@ -128,16 +267,24 @@ const MediaCard = ({
   };
 
   const handleAddComment = async () => {
+    // Check if user is logged in
+    if (!user || !user._id) {
+      showErrorToast("Please log in to comment");
+      return;
+    }
+
+    // Check if comment is empty or already submitting
     if (!commentText.trim() || isSubmitting) return;
 
+    // Optimistically update UI
     setIsSubmitting(true);
+    const tempCommentText = commentText.trim(); // Store for API call
+    setCommentText(""); // Clear input immediately for better UX
+
     try {
       // If custom handler is provided, use it
       if (customHandlers?.handleAddComment) {
-        await customHandlers.handleAddComment(commentText);
-
-        // Clear the input
-        setCommentText("");
+        await customHandlers.handleAddComment(tempCommentText);
 
         if (commentInputRef.current) {
           commentInputRef.current.focus();
@@ -146,68 +293,228 @@ const MediaCard = ({
         return;
       }
 
-      // Default behavior
+      // Default behavior - direct approach
       const postStore = usePostStore.getState();
-      const newComment = await postStore.addComment(post._id, commentText);
 
-      // Update the local post object with the new comment
-      if (!post.comments) {
-        post.comments = [];
+      // Make the API call to add a comment
+      const response = await fetch(
+        `${config.backendUrl}/api/posts/${post._id}/comment`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ text: tempCommentText }),
+          timeout: config.apiTimeouts.medium,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to add comment");
       }
 
-      post.comments = [newComment, ...post.comments];
-      // Don't update the comment count here, it will be updated by the store
+      // Fetch the updated post to get all comments
+      const updatedResponse = await fetch(
+        `${config.backendUrl}/api/posts/${post._id}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: config.apiTimeouts.medium,
+        }
+      );
 
-      // Clear the input
-      setCommentText("");
+      const updatedData = await updatedResponse.json();
+
+      if (updatedData.success) {
+        // Process the updated post
+        const updatedPost = postStore.processPost(updatedData.data, user);
+
+        // Update the post in the store
+        postStore.updatePostInStore(updatedPost);
+
+        // Update local state
+        setCommentCount(updatedPost.commentCount);
+
+        // Show comments if they're not already visible
+        if (!showComments) {
+          setShowComments(true);
+        }
+      }
 
       // Focus back on the input for easy commenting
       if (commentInputRef.current) {
         commentInputRef.current.focus();
       }
 
-      showSuccessToast("Comment added successfully");
+      showSuccessToast("Comment added");
     } catch (error) {
       console.error("Error adding comment:", error);
       showErrorToast("Failed to add comment. Please try again.");
+      // Restore the comment text if there was an error
+      setCommentText(tempCommentText);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Toggle comments visibility with data fetching
+  const toggleComments = async () => {
+    // If we're about to show comments, always fetch the latest data
+    if (!showComments) {
+      try {
+        // Show loading state
+        setIsSubmitting(true);
+
+        const response = await fetch(
+          `${config.backendUrl}/api/posts/${post._id}`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            timeout: config.apiTimeouts.medium,
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          // Update the post in the store with the latest data including comments
+          const postStore = usePostStore.getState();
+          const processedPost = postStore.processPost(data.data, user);
+          postStore.updatePostInStore(processedPost);
+
+          // Update local state with the latest counts
+          if (processedPost.comments) {
+            setCommentCount(
+              processedPost.comments.length || processedPost.commentCount || 0
+            );
+          }
+          if (processedPost.likes) {
+            setLikeCount(
+              processedPost.likes.length || processedPost.likeCount || 0
+            );
+
+            // Update like status
+            const userLiked = processedPost.likes.some((like) =>
+              typeof like === "string"
+                ? like === user._id
+                : like._id === user._id
+            );
+            setIsLiked(userLiked);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching post comments:", error);
+        showErrorToast("Failed to load comments");
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    setShowComments(!showComments);
+  };
+
   const generateSharedLink = () => {
-    return `${
-      process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin
-    }/posts/${post?._id}`;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
+    return `${baseUrl}/posts/${post?._id}`;
   };
 
   const handleShare = async (platform) => {
+    // Check if user is logged in
+    if (!user || !user._id) {
+      showErrorToast("Please log in to share posts");
+      return;
+    }
+
+    // Optimistically update UI
+    setShareCount((prev) => prev + 1);
+
     try {
       // If custom handler is provided, use it
       if (customHandlers?.handleShare) {
         customHandlers.handleShare(platform);
         showSuccessToast(`Post shared on ${platform}`);
-      } else {
-        // Default behavior - call the sharePost function
-        await sharePost(post._id);
-        showSuccessToast(`Post shared on ${platform}`);
+        return;
       }
 
-      // Don't update the share count here, it will be updated by the store
+      // Default behavior - direct approach
+      // Make the API call to share the post
+      const response = await fetch(
+        `${config.backendUrl}/api/posts/${post._id}/share`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ platform }),
+          timeout: config.apiTimeouts.short,
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        showSuccessToast(`Post shared on ${platform}`);
+
+        // Fetch the updated post to get the latest share count
+        const updatedResponse = await fetch(
+          `${config.backendUrl}/api/posts/${post._id}`,
+          {
+            method: "GET",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            timeout: config.apiTimeouts.medium,
+          }
+        );
+
+        const updatedData = await updatedResponse.json();
+
+        if (updatedData.success) {
+          // Process the updated post
+          const postStore = usePostStore.getState();
+          const updatedPost = postStore.processPost(updatedData.data, user);
+
+          // Update the post in the store
+          postStore.updatePostInStore(updatedPost);
+
+          // Update local state
+          setShareCount(updatedPost.shareCount);
+        }
+      } else {
+        // Revert UI changes on error
+        setShareCount((prev) => Math.max(0, prev - 1));
+        showErrorToast(data.message || "Failed to share post");
+      }
     } catch (error) {
+      // Revert UI changes on error
+      setShareCount((prev) => Math.max(0, prev - 1));
       console.error("Error sharing post:", error);
       showErrorToast("Failed to share post");
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    try {
-      return format(new Date(dateString), "MMM d, yyyy");
-    } catch (error) {
-      return dateString;
-    }
-  };
+  // Helper function to format dates consistently
+  // Used directly in the JSX below
+  // const formatDate = (dateString) => {
+  //   if (!dateString) return "";
+  //   try {
+  //     return format(new Date(dateString), "MMM d, yyyy");
+  //   } catch (error) {
+  //     return dateString;
+  //   }
+  // };
 
   const isOwner = user?._id === post?.user?._id;
 
@@ -257,12 +564,13 @@ const MediaCard = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
+                  {/* Edit functionality will be implemented in the future */}
+                  {/* <DropdownMenuItem
                     className="cursor-pointer"
                     onClick={() => setIsEditFormOpen(true)}
                   >
                     <Edit className="mr-2 h-4 w-4" /> Edit Post
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
                   <DropdownMenuItem
                     className="cursor-pointer text-red-500 focus:text-red-500"
                     onClick={handleDeletePost}
@@ -311,13 +619,19 @@ const MediaCard = ({
           )}
 
           <div className="flex justify-between items-center mb-4">
-            <span className="text-sm text-gray-500 dark:text-gray-400 hover:underline cursor-pointer">
+            <span
+              className={`text-sm hover:underline cursor-pointer ${
+                isLiked
+                  ? "text-blue-600 dark:text-blue-500 font-semibold"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
               {likeCount} {likeCount === 1 ? "like" : "likes"}
             </span>
             <div className="flex gap-3">
               <span
                 className="text-sm text-gray-500 dark:text-gray-400 hover:underline cursor-pointer"
-                onClick={() => setShowComments(!showComments)}
+                onClick={toggleComments}
               >
                 {commentCount} {commentCount === 1 ? "comment" : "comments"}
               </span>
@@ -333,16 +647,25 @@ const MediaCard = ({
             <Button
               variant="ghost"
               className={`flex-1 ${
-                isLiked ? "text-blue-500 dark:text-blue-400" : ""
+                isLiked ? "text-blue-600 dark:text-blue-500 font-semibold" : ""
               } dark:hover:bg-gray-600`}
               onClick={handleLikeToggle}
             >
-              <ThumbsUp className="mr-2 h-4 w-4" /> {isLiked ? "Liked" : "Like"}
+              {isLiked ? (
+                <>
+                  <ThumbsUp className="mr-2 h-4 w-4 fill-blue-600 dark:fill-blue-500" />{" "}
+                  Liked
+                </>
+              ) : (
+                <>
+                  <ThumbsUp className="mr-2 h-4 w-4" /> Like
+                </>
+              )}
             </Button>
             <Button
               variant="ghost"
               className="flex-1 dark:hover:bg-gray-600"
-              onClick={() => setShowComments(!showComments)}
+              onClick={toggleComments}
             >
               <MessageCircle className="mr-2 h-4 w-4" /> Comment
             </Button>

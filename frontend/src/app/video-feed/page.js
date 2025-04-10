@@ -9,19 +9,21 @@ import MediaCard from "@/components/shared/MediaCard";
 import usePostStore from "@/store/postStore";
 
 export default function VideoFeedPage() {
-  const { loading, error } = usePostStore();
-  const [videoPosts, setVideoPosts] = useState([]);
+  const { posts, loading, error, fetchVideoPosts } = usePostStore();
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  const [videoPosts, setVideoPosts] = useState([]);
 
+  // Load video posts on mount
   useEffect(() => {
     const loadVideoPosts = async () => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const postStore = usePostStore.getState();
-        const result = await postStore.fetchVideoPosts(1, 20);
-        setVideoPosts(result.posts);
+        const result = await fetchVideoPosts(1, 20);
+        if (result && result.error) {
+          setLoadError(result.error);
+        }
       } catch (error) {
         console.error("Error loading video posts:", error);
         setLoadError(error.message || "Failed to load video posts");
@@ -31,7 +33,24 @@ export default function VideoFeedPage() {
     };
 
     loadVideoPosts();
-  }, []);
+  }, [fetchVideoPosts]);
+
+  // Filter video posts from the store whenever posts change
+  useEffect(() => {
+    if (posts && posts.length > 0) {
+      // Filter for video posts only
+      const videoOnlyPosts = posts.filter((post) => post.mediaType === "video");
+
+      // Sort by newest first
+      const sortedPosts = [...videoOnlyPosts].sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      setVideoPosts(sortedPosts);
+    } else {
+      setVideoPosts([]);
+    }
+  }, [posts]);
 
   return (
     <>
@@ -52,6 +71,9 @@ export default function VideoFeedPage() {
         <Card>
           <CardContent className="p-6 text-center py-10">
             <p className="text-red-500 dark:text-red-400">Error: {loadError}</p>
+            <Button className="mt-4" onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
           </CardContent>
         </Card>
       ) : videoPosts.length > 0 ? (
@@ -66,6 +88,9 @@ export default function VideoFeedPage() {
             <p className="text-gray-500 dark:text-gray-400">
               No video posts available.
             </p>
+            <Button className="mt-4" onClick={() => fetchVideoPosts(1, 20)}>
+              Refresh
+            </Button>
           </CardContent>
         </Card>
       )}
