@@ -1,108 +1,75 @@
-import config from "@/lib/config";
-import {
-  showSuccessToast,
-  showErrorToast,
-  showInfoToast,
-} from "@/lib/toastUtils";
+/**
+ * Post Interaction Helpers
+ * 
+ * This module provides helper functions for post interactions (like, comment, share)
+ * that can be used across different components.
+ * 
+ * These functions are designed to:
+ * 1. Provide a consistent interface for post interactions
+ * 2. Handle optimistic updates for better UX
+ * 3. Properly handle errors and rollbacks
+ * 4. Update UI state consistently
+ */
+
 import usePostStore from "@/store/postStore";
+import userStore from "@/store/userStore";
+import { showSuccessToast, showErrorToast, showInfoToast } from "@/lib/toastUtils";
 
 /**
  * Toggle like status for a post
- * @param {Object} post - The post object
- * @param {boolean} isLiked - Current like status
+ * @param {string} postId - The post ID
+ * @param {boolean} isLiked - Current like status in UI
  * @param {Function} setIsLiked - Function to update like status state
  * @param {Function} setLikeCount - Function to update like count state
- * @param {Object} user - Current user object
  * @returns {Promise<void>}
  */
 export const togglePostLike = async (
-  post,
+  postId,
   isLiked,
   setIsLiked,
-  setLikeCount,
-  user
+  setLikeCount
 ) => {
-  // Check if user is logged in
-  if (!user || !user._id) {
-    showErrorToast("Please log in to like posts");
-    return;
-  }
-
   try {
-    // Determine the action based on current UI state
-    const action = isLiked ? "unlike" : "like";
+    // Get current user
+    const { user } = userStore.getState();
+    if (!user || !user._id) {
+      showErrorToast("Please log in to like posts");
+      return;
+    }
 
-    // Temporarily update UI for better UX
+    // Toggle the like state immediately for better UX
     const newLikedState = !isLiked;
+    
+    // Update UI immediately (optimistic update)
     setIsLiked(newLikedState);
-    setLikeCount(
-      newLikedState
-        ? (post.likeCount || 0) + 1
-        : Math.max(0, (post.likeCount || 1) - 1)
-    );
+    setLikeCount((prev) => (newLikedState ? prev + 1 : Math.max(0, prev - 1)));
 
-    // Make the API call
-    const response = await fetch(
-      `${config.backendUrl}/api/posts/${post._id}/${action}`,
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: config.apiTimeouts.short,
-      }
-    );
+    // Call the store method
+    const postStore = usePostStore.getState();
+    const result = await postStore.togglePostLike(postId);
 
-    const data = await response.json();
+    // Always update UI with the state returned from the server
+    setIsLiked(result.isLiked);
+    
+    // Use the actual like count from the server if available
+    if (result.likeCount !== null && result.likeCount !== undefined) {
+      setLikeCount(result.likeCount);
+    }
 
-    // After the API call, get the current state to ensure accuracy
-    const getResponse = await fetch(
-      `${config.backendUrl}/api/posts/${post._id}`,
-      {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: config.apiTimeouts.short,
-      }
-    );
-
-    const getPostData = await getResponse.json();
-
-    if (getPostData.success) {
-      // Get the actual state from the server
-      const serverIsLiked = getPostData.data.likes.includes(user._id);
-      const serverLikeCount = getPostData.data.likeCount || 0;
-
-      // Update UI to match server state
-      setIsLiked(serverIsLiked);
-      setLikeCount(serverLikeCount);
-
-      // Update the post in the store
-      const postStore = usePostStore.getState();
-      postStore.updatePostInStore({
-        ...post,
-        isLiked: serverIsLiked,
-        likeCount: serverLikeCount,
-      });
-
-      // Show appropriate message
-      if (serverIsLiked) {
-        showSuccessToast("Post liked");
-      } else {
-        showInfoToast("Post unliked");
-      }
+    // Show success message
+    if (result.isLiked) {
+      showSuccessToast("Post liked");
     } else {
-      throw new Error("Failed to get updated post state");
+      showInfoToast("Post unliked");
     }
   } catch (error) {
+    console.error("Error toggling post like:", error);
+    
     // Revert UI changes on error
     setIsLiked(isLiked);
-    setLikeCount(post.likeCount || 0);
-    console.error("Error toggling like:", error);
-    showErrorToast("Failed to update like status");
+    
+    // Show error message
+    showErrorToast(error.message || "Failed to update like status");
   }
 };
 
@@ -111,121 +78,64 @@ export const togglePostLike = async (
  * @param {string} postId - The post ID
  * @param {string} commentText - The comment text
  * @param {Function} setCommentText - Function to update comment text state
- * @param {Function} setComments - Function to update comments state
  * @param {Function} setCommentCount - Function to update comment count state
- * @param {Object} user - Current user object
  * @param {Function} setIsSubmitting - Function to update submitting state
+ * @param {Function} onCommentAdded - Optional callback when comment is added
  * @returns {Promise<void>}
  */
 export const addPostComment = async (
   postId,
   commentText,
   setCommentText,
-  setComments,
   setCommentCount,
-  user,
-  setIsSubmitting
+  setIsSubmitting,
+  onCommentAdded = null
 ) => {
-  // Check if user is logged in
-  if (!user || !user._id) {
-    showErrorToast("Please log in to comment");
-    return;
-  }
-
-  // Check if comment text is empty
-  if (!commentText.trim()) {
-    return;
-  }
-
   try {
-    setIsSubmitting(true);
-    const tempCommentText = commentText.trim();
-    setCommentText(""); // Clear input immediately for better UX
-
-    // Make the API call directly
-    const response = await fetch(
-      `${config.backendUrl}/api/posts/${postId}/comment`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text: tempCommentText }),
-        timeout: config.apiTimeouts.medium,
-      }
-    );
-
-    const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.message || "Failed to add comment");
+    // Get current user
+    const { user } = userStore.getState();
+    if (!user || !user._id) {
+      showErrorToast("Please log in to comment");
+      return;
     }
 
-    // Get the actual comment data from the response
-    // This ensures we're using the server's data structure
-    const serverComment = data.data;
+    // Check if comment text is empty
+    if (!commentText.trim()) {
+      return;
+    }
 
-    // Make sure the comment has all required fields
-    const newComment = {
-      _id: serverComment._id,
-      text: serverComment.text,
-      user: serverComment.user || {
-        _id: user._id,
-        username: user.username,
-        profilePicture: user.profilePicture,
-      },
-      createdAt: serverComment.createdAt || new Date().toISOString(),
-      likes: [],
-      likeCount: 0,
-      replies: [],
-      replyCount: 0,
-    };
+    // Set submitting state
+    if (setIsSubmitting) setIsSubmitting(true);
+    
+    // Store comment text and clear input immediately for better UX
+    const tempCommentText = commentText.trim();
+    setCommentText("");
 
-    // Log the comment for debugging
-    console.log("New comment created:", newComment);
+    // Call the store method
+    const postStore = usePostStore.getState();
+    const newComment = await postStore.addComment(postId, tempCommentText);
 
-    // Update UI - only add this one comment
-    // First check if the comment already exists to avoid duplicates
-    setComments((prev) => {
-      // Check if comment already exists
-      const exists = prev.some((comment) => comment._id === newComment._id);
-      if (exists) {
-        return prev; // Don't add if it already exists
-      }
-      return [newComment, ...prev];
-    });
-
+    // Update comment count
     setCommentCount((prev) => prev + 1);
 
-    // Update the post in the store
-    const postStore = usePostStore.getState();
-    const existingPost = postStore.posts.find((p) => p._id === postId);
-
-    if (existingPost) {
-      // Only add the new comment, don't duplicate
-      const updatedComments = [newComment, ...(existingPost.comments || [])];
-
-      // Make sure we don't have duplicates
-      const uniqueComments = updatedComments.filter(
-        (comment, index, self) =>
-          index === self.findIndex((c) => c._id === comment._id)
-      );
-
-      postStore.updatePostInStore({
-        ...existingPost,
-        comments: uniqueComments,
-        commentCount: (existingPost.commentCount || 0) + 1,
-      });
+    // Call the callback if provided
+    if (onCommentAdded) {
+      onCommentAdded(newComment);
     }
 
+    // Show success message
     showSuccessToast("Comment added");
   } catch (error) {
     console.error("Error adding comment:", error);
-    showErrorToast("Failed to add comment");
-    setCommentText(commentText); // Restore comment text on error
+    
+    // Show error message
+    showErrorToast(error.message || "Failed to add comment");
+    
+    // Restore comment text on error
+    setCommentText(commentText);
   } finally {
-    setIsSubmitting(false);
+    // Reset submitting state
+    if (setIsSubmitting) setIsSubmitting(false);
   }
 };
 
@@ -234,7 +144,6 @@ export const addPostComment = async (
  * @param {string} postId - The post ID
  * @param {string} platform - The platform to share on
  * @param {Function} setShareCount - Function to update share count state
- * @param {Object} user - Current user object
  * @param {Function} setIsShareDialogOpen - Function to update share dialog state
  * @returns {Promise<void>}
  */
@@ -242,61 +151,38 @@ export const sharePost = async (
   postId,
   platform,
   setShareCount,
-  user,
-  setIsShareDialogOpen
+  setIsShareDialogOpen = null
 ) => {
-  // Check if user is logged in
-  if (!user || !user._id) {
-    showErrorToast("Please log in to share posts");
-    return;
-  }
-
-  // Update UI immediately
-  setShareCount((prev) => prev + 1);
-
   try {
-    // Make the API call directly to ensure we're using the latest API
-    const response = await fetch(
-      `${config.backendUrl}/api/posts/${postId}/share`,
-      {
-        method: "PUT",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ platform }),
-        timeout: config.apiTimeouts.short,
-      }
-    );
-
-    const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.message || "Failed to share post");
+    // Get current user
+    const { user } = userStore.getState();
+    if (!user || !user._id) {
+      showErrorToast("Please log in to share posts");
+      return;
     }
 
-    // Update the post in the store
+    // Update UI immediately (optimistic update)
+    setShareCount((prev) => prev + 1);
+
+    // Call the store method
     const postStore = usePostStore.getState();
-    const existingPost = postStore.posts.find((p) => p._id === postId);
+    await postStore.sharePost(postId, platform);
 
-    if (existingPost) {
-      postStore.updatePostInStore({
-        ...existingPost,
-        shareCount: data.data.shareCount,
-      });
-    }
-
-    // Close the share dialog
+    // Close the share dialog if provided
     if (setIsShareDialogOpen) {
       setIsShareDialogOpen(false);
     }
 
+    // Show success message
     showSuccessToast(`Post shared on ${platform}`);
   } catch (error) {
+    console.error("Error sharing post:", error);
+    
     // Revert UI changes on error
     setShareCount((prev) => Math.max(0, prev - 1));
-    console.error("Error sharing post:", error);
-    showErrorToast("Failed to share post");
+    
+    // Show error message
+    showErrorToast(error.message || "Failed to share post");
   }
 };
 
@@ -306,7 +192,6 @@ export const sharePost = async (
  * @returns {string} - The shareable link
  */
 export const generateSharedLink = (postId) => {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
+  const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
   return `${baseUrl}/posts/${postId}`;
 };

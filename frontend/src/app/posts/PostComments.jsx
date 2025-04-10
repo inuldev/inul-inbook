@@ -1,454 +1,281 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { format } from "date-fns";
-import {
-  ChevronDown,
-  ChevronUp,
-  Send,
-  Trash2,
-  ThumbsUp,
-  Reply,
-} from "lucide-react";
-import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
-import { addPostComment } from "@/lib/postInteractionHelpers";
-import {
-  toggleCommentLike,
-  deleteComment,
-  replyToComment,
-} from "@/lib/commentInteractionHelpers";
+/**
+ * PostComments Component
+ * 
+ * A component for displaying comments on posts.
+ */
 
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
+import { format } from "date-fns";
+import { MoreHorizontal, ThumbsUp, Reply, Trash2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
+import { toggleCommentLike, deleteComment, replyToComment } from "@/lib/commentInteractionHelpers";
 
+/**
+ * PostComments Component
+ * @param {Object} props - Component props
+ * @param {Object} props.post - Post data
+ * @returns {React.ReactElement}
+ */
 const PostComments = ({ post }) => {
   const { user } = userStore();
-  const [showAllComments, setShowAllComments] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [commentLikes, setCommentLikes] = useState({});
-  const [commentLikeCounts, setCommentLikeCounts] = useState({});
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [replyText, setReplyText] = useState("");
-  const [expandedReplies, setExpandedReplies] = useState({});
-  const replyInputRef = useRef(null);
+  const comments = post?.comments || [];
 
-  useEffect(() => {
-    if (post?.comments) {
-      setComments(post.comments);
-
-      // Initialize like states for comments
-      if (user?._id) {
-        const initialLikes = {};
-        const initialLikeCounts = {};
-
-        post.comments.forEach((comment) => {
-          // Check if user has liked this comment
-          const isLiked =
-            comment.likes &&
-            Array.isArray(comment.likes) &&
-            comment.likes.some((like) => {
-              if (typeof like === "string") {
-                return like === user._id;
-              } else if (like && typeof like === "object") {
-                return like._id === user._id;
-              }
-              return false;
-            });
-
-          initialLikes[comment._id] = isLiked;
-          initialLikeCounts[comment._id] = comment.likeCount || 0;
-        });
-
-        setCommentLikes(initialLikes);
-        setCommentLikeCounts(initialLikeCounts);
-      }
-    }
-  }, [post, user?._id]);
-
-  const visibleComments = showAllComments ? comments : comments?.slice(0, 2);
-
-  const handleAddComment = async () => {
-    if (!commentText.trim() || isSubmitting) return;
-
-    // Use the standardized helper function
-    await addPostComment(
-      post._id,
-      commentText,
-      setCommentText,
-      (newComment) => setComments((prev) => [newComment, ...prev]),
-      user,
-      setIsSubmitting
+  // If no comments, show a message
+  if (!comments || comments.length === 0) {
+    return (
+      <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+        No comments yet. Be the first to comment!
+      </div>
     );
+  }
+
+  // Render comments
+  return (
+    <div className="space-y-4">
+      {comments.map((comment) => (
+        <CommentItem
+          key={comment._id}
+          comment={comment}
+          postId={post._id}
+          currentUser={user}
+        />
+      ))}
+    </div>
+  );
+};
+
+/**
+ * CommentItem Component
+ * @param {Object} props - Component props
+ * @param {Object} props.comment - Comment data
+ * @param {string} props.postId - Post ID
+ * @param {Object} props.currentUser - Current user
+ * @returns {React.ReactElement}
+ */
+const CommentItem = ({ comment, postId, currentUser }) => {
+  const [isLiked, setIsLiked] = useState(
+    comment.likes?.includes(currentUser?._id) || false
+  );
+  const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showReplies, setShowReplies] = useState(false);
+  const [replies, setReplies] = useState(comment.replies || []);
+
+  // Check if the current user is the owner of the comment
+  const isOwner = currentUser?._id === comment?.user?._id;
+
+  /**
+   * Handle like button click
+   */
+  const handleLikeToggle = async () => {
+    await toggleCommentLike(comment._id, isLiked, setIsLiked, setLikeCount);
   };
 
-  const handleAddReply = async () => {
-    if (!replyText.trim() || isSubmitting || !replyingTo) return;
+  /**
+   * Handle reply button click
+   */
+  const handleReplyToggle = () => {
+    setShowReplyInput(!showReplyInput);
+    if (!showReplyInput) {
+      setReplyText("");
+    }
+  };
+
+  /**
+   * Handle reply submission
+   */
+  const handleReplySubmit = async () => {
+    if (!replyText.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    const tempReplyText = replyText.trim();
-    setReplyText("");
-
     try {
-      await replyToComment(
-        replyingTo,
-        post._id,
-        tempReplyText,
-        (newReply) => {
-          // Close the dialog
-          setReplyingTo(null);
-
-          // Automatically expand replies for this comment
-          setExpandedReplies((prev) => ({
-            ...prev,
-            [replyingTo]: true,
-          }));
-
-          // Log the reply for debugging
-          console.log("New reply added:", newReply);
-
-          // Update the comments in the local state
-          setComments((prevComments) => {
-            return prevComments.map((comment) => {
-              if (comment._id === replyingTo) {
-                // Add the reply to this comment
-                return {
-                  ...comment,
-                  replies: comment.replies
-                    ? [...comment.replies, newReply]
-                    : [newReply],
-                  replyCount: (comment.replyCount || 0) + 1,
-                };
-              }
-              return comment;
-            });
-          });
-        },
-        user
-      );
-    } catch (error) {
-      console.error("Error replying to comment:", error);
-      showErrorToast("Failed to reply to comment");
+      await replyToComment(comment._id, postId, replyText, (newReply) => {
+        setReplies((prev) => [newReply, ...prev]);
+        setReplyText("");
+        setShowReplyInput(false);
+        setShowReplies(true);
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "";
-    try {
-      return format(new Date(dateString), "MMM d, yyyy 'at' h:mm a");
-    } catch (error) {
-      return dateString;
-    }
+  /**
+   * Handle delete button click
+   */
+  const handleDelete = async () => {
+    await deleteComment(comment._id, postId, () => {
+      // This will be handled by the parent component
+    });
+  };
+
+  /**
+   * Toggle replies visibility
+   */
+  const toggleReplies = () => {
+    setShowReplies(!showReplies);
   };
 
   return (
-    <div className="mt-4">
-      <h3 className="font-semibold mb-2">Comments</h3>
-
-      <div className="flex items-center space-x-2 mb-4">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={user?.profilePicture} />
-          <AvatarFallback className="dark:bg-gray-400">
-            {user?.username?.charAt(0) || "U"}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-grow relative">
-          <Input
-            placeholder="Write a comment..."
-            className="rounded-full h-12 dark:bg-[rgb(58,59,60)] pr-12"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleAddComment();
-              }
-            }}
-            disabled={isSubmitting}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 hover:bg-transparent"
-            onClick={handleAddComment}
-            disabled={!commentText.trim() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Send className="h-5 w-5 text-blue-500" />
+    <div className="flex space-x-2">
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={comment?.user?.profilePicture} />
+        <AvatarFallback className="dark:bg-gray-400">
+          {comment?.user?.username?.substring(0, 2).toUpperCase() || "U"}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1">
+        <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-semibold text-sm dark:text-white">
+                {comment?.user?.username || "Unknown User"}
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-200">
+                {comment?.text}
+              </p>
+            </div>
+            {isOwner && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-6 w-6 p-0 dark:text-gray-300"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className="text-red-600 dark:text-red-400"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          </Button>
-        </div>
-      </div>
-
-      {comments?.length > 0 ? (
-        <div className="max-h-60 overflow-y-auto pr-2">
-          {visibleComments?.map((comment) => (
-            <div key={comment?._id} className="flex flex-col space-y-2 mb-4">
-              {/* Main Comment */}
-              <div className="flex items-start space-x-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={comment?.user?.profilePicture} />
-                  <AvatarFallback className="dark:bg-gray-400">
-                    {comment?.user?.username?.charAt(0) || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col flex-grow">
-                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
-                    <p className="font-bold text-sm">
-                      {comment?.user?.username || "User"}
-                    </p>
-                    <p className="text-sm">{comment?.text}</p>
-                  </div>
-                  <div className="flex items-center text-xs text-gray-500 mt-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-6 px-2 ${
-                        commentLikes[comment?._id] ? "text-blue-500" : ""
-                      }`}
-                      onClick={() =>
-                        toggleCommentLike(
-                          comment._id,
-                          commentLikes[comment._id] || false,
-                          (newState) =>
-                            setCommentLikes((prev) => ({
-                              ...prev,
-                              [comment._id]: newState,
-                            })),
-                          (updater) =>
-                            setCommentLikeCounts((prev) => ({
-                              ...prev,
-                              [comment._id]: updater(prev[comment._id] || 0),
-                            })),
-                          user
-                        )
-                      }
-                    >
-                      <ThumbsUp
-                        className={`h-3 w-3 mr-1 ${
-                          commentLikes[comment?._id] ? "fill-blue-500" : ""
-                        }`}
-                      />
-                      {commentLikeCounts[comment?._id] || 0}{" "}
-                      {commentLikes[comment?._id] ? "Liked" : "Like"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2"
-                      onClick={() => setReplyingTo(comment._id)}
-                    >
-                      <Reply className="h-3 w-3 mr-1" /> Reply
-                    </Button>
-                    {user?._id === comment?.user?._id && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-red-500"
-                        onClick={() =>
-                          deleteComment(
-                            comment._id,
-                            post._id,
-                            (deletedCommentId) => {
-                              // Remove the deleted comment from the local state
-                              setComments((prev) =>
-                                prev.filter((c) => c._id !== deletedCommentId)
-                              );
-                            },
-                            user
-                          )
-                        }
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" /> Delete
-                      </Button>
-                    )}
-                    <span className="ml-2">
-                      {formatDate(comment?.createdAt)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Replies Section */}
-              {comment.replies && comment.replies.length > 0 && (
-                <div className="ml-10">
-                  {/* Toggle Replies Button */}
-                  {comment.replies.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs mb-1 h-6 px-2"
-                      onClick={() =>
-                        setExpandedReplies((prev) => ({
-                          ...prev,
-                          [comment._id]: !prev[comment._id],
-                        }))
-                      }
-                    >
-                      {expandedReplies[comment._id] ? (
-                        <>
-                          <ChevronUp className="h-3 w-3 mr-1" /> Hide{" "}
-                          {comment.replies.length}{" "}
-                          {comment.replies.length === 1 ? "reply" : "replies"}
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3 w-3 mr-1" /> View{" "}
-                          {comment.replies.length}{" "}
-                          {comment.replies.length === 1 ? "reply" : "replies"}
-                        </>
-                      )}
-                    </Button>
-                  )}
-
-                  {/* Replies List */}
-                  {expandedReplies[comment._id] &&
-                    comment.replies.map((reply) => (
-                      <div
-                        key={reply._id}
-                        className="flex items-start space-x-2 mb-2 mt-1"
-                      >
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={reply?.user?.profilePicture} />
-                          <AvatarFallback className="dark:bg-gray-400 text-xs">
-                            {reply?.user?.username
-                              ?.substring(0, 2)
-                              .toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col flex-grow">
-                          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
-                            <p className="font-bold text-xs">
-                              {reply?.user?.username || "User"}
-                            </p>
-                            <p className="text-xs">{reply?.text}</p>
-                          </div>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
-                            <span className="text-xs text-gray-400">
-                              {formatDate(reply?.createdAt)}
-                            </span>
-                            {user?._id === reply?.user?._id && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-1 ml-2 text-red-500"
-                                onClick={() =>
-                                  deleteComment(
-                                    reply._id,
-                                    post._id,
-                                    () => {
-                                      // This will be handled by the store update
-                                    },
-                                    user
-                                  )
-                                }
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {comments?.length > 2 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2 text-blue-500 dark:text-blue-400"
-              onClick={() => setShowAllComments(!showAllComments)}
-            >
-              {showAllComments ? (
-                <>
-                  Show Less <ChevronUp className="ml-1 h-4 w-4" />
-                </>
-              ) : (
-                <>
-                  Show All {comments.length} Comments{" "}
-                  <ChevronDown className="ml-1 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="text-center py-4 text-gray-500">
-          <p>No comments yet. Be the first to comment!</p>
-        </div>
-      )}
-
-      {/* Reply Dialog */}
-      <Dialog
-        open={!!replyingTo}
-        onOpenChange={(open) => {
-          if (!open) setReplyingTo(null);
-          setReplyText("");
-        }}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Reply to Comment</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <div className="flex items-center space-x-2 mb-4">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.profilePicture} />
-                <AvatarFallback className="dark:bg-gray-400">
-                  {user?.username?.substring(0, 2).toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="relative flex-grow">
-                <Input
-                  ref={replyInputRef}
-                  placeholder="Write a reply..."
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  disabled={isSubmitting}
-                  className="pr-10 dark:border-gray-400"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAddReply();
-                    }
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 hover:bg-transparent"
-                  onClick={handleAddReply}
-                  disabled={!replyText.trim() || isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  ) : (
-                    <Send className="h-5 w-5 text-blue-500" />
-                  )}
-                </Button>
-              </div>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+        <div className="flex items-center mt-1 space-x-3 text-xs">
+          <button
+            onClick={handleLikeToggle}
+            className={`flex items-center ${
+              isLiked
+                ? "text-blue-600 dark:text-blue-500 font-semibold"
+                : "text-gray-500 dark:text-gray-400"
+            }`}
+          >
+            <ThumbsUp className="h-3 w-3 mr-1" />
+            {isLiked ? "Liked" : "Like"} ({likeCount})
+          </button>
+          <button
+            onClick={handleReplyToggle}
+            className="flex items-center text-gray-500 dark:text-gray-400"
+          >
+            <Reply className="h-3 w-3 mr-1" />
+            Reply
+          </button>
+          <span className="text-gray-500 dark:text-gray-400">
+            {comment?.createdAt
+              ? format(new Date(comment.createdAt), "MMM dd, yyyy")
+              : "Unknown date"}
+          </span>
+        </div>
+
+        {/* Reply input */}
+        {showReplyInput && (
+          <div className="mt-2 flex">
+            <Input
+              className="flex-1 mr-2 text-sm dark:border-gray-400"
+              placeholder="Write a reply..."
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              disabled={isSubmitting}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleReplySubmit();
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={handleReplySubmit}
+              disabled={!replyText.trim() || isSubmitting}
+            >
+              Reply
+            </Button>
+          </div>
+        )}
+
+        {/* Replies */}
+        {replies.length > 0 && (
+          <div className="mt-2">
+            <button
+              onClick={toggleReplies}
+              className="text-sm text-blue-600 dark:text-blue-500"
+            >
+              {showReplies
+                ? "Hide replies"
+                : `Show ${replies.length} ${
+                    replies.length === 1 ? "reply" : "replies"
+                  }`}
+            </button>
+            {showReplies && (
+              <div className="mt-2 space-y-2 pl-4 border-l-2 border-gray-200 dark:border-gray-600">
+                {replies.map((reply) => (
+                  <div key={reply._id} className="flex space-x-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={reply?.user?.profilePicture} />
+                      <AvatarFallback className="dark:bg-gray-400">
+                        {reply?.user?.username?.substring(0, 2).toUpperCase() ||
+                          "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-2">
+                        <p className="font-semibold text-xs dark:text-white">
+                          {reply?.user?.username || "Unknown User"}
+                        </p>
+                        <p className="text-xs text-gray-700 dark:text-gray-200">
+                          {reply?.text}
+                        </p>
+                      </div>
+                      <div className="flex items-center mt-1 space-x-2 text-xs">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {reply?.createdAt
+                            ? format(
+                                new Date(reply.createdAt),
+                                "MMM dd, yyyy"
+                              )
+                            : "Unknown date"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

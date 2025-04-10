@@ -280,6 +280,7 @@ The application has different behaviors based on the environment:
 - **Shadcn/UI**: High-quality UI components built on Radix UI
 - **Zustand**: Lightweight state management with persistent storage
 - **Responsive Design**: Mobile-friendly interface that works on all devices
+- **BaseCard Component**: Standardized card component for consistent UI across the application
 
 ### Backend Features
 
@@ -346,22 +347,31 @@ The application has different behaviors based on the environment:
    - Check if the redirect URI is whitelisted in Google Developer Console
 
 4. **JWT authentication issues**
+
    - Make sure JWT_SECRET is set in your .env file
    - Check if the token is being properly sent in requests
    - Verify that cookies are enabled in your browser
 
+5. **Like/Unlike functionality issues**
+   - Check browser console for errors
+   - Verify that the user is logged in
+   - Ensure the post ID is correct
+   - Check if the post exists in the database
+
 ## 📚 Project Structure
+
+The project follows a modular structure to ensure maintainability and scalability. For a detailed view of the project structure, see [STRUCTURE.md](STRUCTURE.md).
 
 ### Backend Structure
 
 ```
 backend/
-├── config/         # Configuration files (DB, Passport)
+├── config/         # Configuration files (DB, Cloudinary)
 ├── controllers/    # Route controllers
 ├── middleware/     # Custom middleware
-├── model/          # Mongoose models
+├── models/         # Mongoose models
 ├── routes/         # API routes
-└── index.js        # Entry point
+└── server.js       # Entry point
 ```
 
 ### Frontend Structure
@@ -370,17 +380,13 @@ backend/
 frontend/
 ├── public/         # Static files
 ├── src/
-│   ├── app/        # Next.js app directory
-│   │   ├── components/  # Shared components
-│   │   ├── posts/       # Post-related components
-│   │   ├── story/       # Story-related components
-│   │   ├── user-login/  # Login page
-│   │   ├── user-profile/# Profile pages
-│   │   └── user-register/# Registration page
-│   ├── components/  # UI components
-│   ├── lib/         # Utility functions
-│   └── store/       # Zustand stores
-└── next.config.js   # Next.js configuration
+│   ├── app/        # Next.js app directory (pages and routes)
+│   ├── components/ # UI components
+│   │   ├── shared/ # Shared components (BaseCard, MediaCard, etc.)
+│   │   └── ui/     # Shadcn/UI components
+│   ├── lib/        # Utility functions and helpers
+│   └── store/      # Zustand stores
+└── next.config.js  # Next.js configuration
 ```
 
 ## 👍 Contributing
@@ -399,6 +405,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👋 Conclusion
 
-This social media application provides a solid foundation for building a Facebook-like platform. It includes all the essential features like authentication, posts, stories, and user interactions. The application is designed to be scalable and can be extended with additional features as needed.
+This social media application provides a solid foundation for building a Facebook-like platform. It includes all the essential features like authentication, posts, stories, and user interactions. The application has been refactored to use a more modular and maintainable structure, with standardized components and consistent implementations across the codebase.
 
 For any questions or issues, please open an issue on the GitHub repository.

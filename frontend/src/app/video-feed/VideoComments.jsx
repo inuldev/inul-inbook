@@ -1,7 +1,31 @@
-import React from "react";
+"use client";
+
+/**
+ * VideoComments Component
+ *
+ * A component for displaying comments on video posts.
+ */
+
+import React, { useState } from "react";
+import { format } from "date-fns";
+import { MoreHorizontal, ThumbsUp, Reply, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import userStore from "@/store/userStore";
+import {
+  toggleCommentLike,
+  deleteComment,
+  replyToComment,
+} from "@/lib/commentInteractionHelpers";
 
 const VideoComments = ({ comments }) => {
   if (!comments || comments.length === 0) {

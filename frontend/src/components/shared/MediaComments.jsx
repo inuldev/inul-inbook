@@ -10,12 +10,6 @@ import {
   Reply,
   Send,
 } from "lucide-react";
-import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
-import {
-  toggleCommentLike,
-  deleteComment,
-  replyToComment,
-} from "@/lib/commentInteractionHelpers";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +22,11 @@ import {
 } from "@/components/ui/dialog";
 
 import userStore from "@/store/userStore";
-import usePostStore from "@/store/postStore";
+import {
+  toggleCommentLike,
+  deleteComment,
+  replyToComment,
+} from "@/lib/commentInteractionHelpers";
 
 const MediaComments = ({ comments, postId }) => {
   const { user } = userStore();

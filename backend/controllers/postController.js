@@ -394,6 +394,10 @@ const likePost = async (req, res) => {
       success: true,
       message: "Post liked successfully",
       userId: req.user.id,
+      data: {
+        likeCount: post.likeCount,
+        likes: post.likes,
+      },
     });
   } catch (error) {
     res.status(500).json({
@@ -438,6 +442,10 @@ const unlikePost = async (req, res) => {
       success: true,
       message: "Post unliked successfully",
       userId: req.user.id,
+      data: {
+        likeCount: post.likeCount,
+        likes: post.likes,
+      },
     });
   } catch (error) {
     res.status(500).json({
