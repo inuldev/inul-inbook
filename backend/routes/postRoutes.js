@@ -63,7 +63,7 @@ router.put("/:id/direct", protect, updatePostWithDirectUpload);
 router.delete("/:id", protect, deletePost);
 router.put("/:id/like", protect, likePost);
 router.put("/:id/unlike", protect, unlikePost);
-router.post("/:id/share", protect, sharePost);
+router.put("/:id/share", protect, sharePost);
 router.post("/:id/comment", protect, commentOnPost);
 router.post("/comments/:id/reply", protect, replyToComment);
 router.delete("/comments/:id", protect, deleteComment);

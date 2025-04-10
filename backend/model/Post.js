@@ -44,6 +44,22 @@ const postSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    shares: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        platform: {
+          type: String,
+          enum: ["facebook", "twitter", "linkedin", "copy", "other"],
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     privacy: {
       type: String,
       enum: ["public", "friends", "private"],

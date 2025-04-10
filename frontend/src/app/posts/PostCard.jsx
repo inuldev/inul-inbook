@@ -16,11 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
 import {
-  showSuccessToast,
-  showErrorToast,
-  showInfoToast,
-} from "@/lib/toastUtils";
+  togglePostLike,
+  sharePost,
+  generateSharedLink,
+} from "@/lib/postInteractionHelpers";
 import {
   Dialog,
   DialogContent,
@@ -43,7 +44,7 @@ import userStore from "@/store/userStore";
 
 const PostCard = ({ post }) => {
   const { user } = userStore();
-  const { likePost, unlikePost, deletePost } = usePostStore();
+  const { deletePost } = usePostStore();
   const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
@@ -66,22 +67,8 @@ const PostCard = ({ post }) => {
   }, [post, user]);
 
   const handleLikeToggle = async () => {
-    try {
-      if (isLiked) {
-        await unlikePost(post._id);
-        setIsLiked(false);
-        setLikeCount((prev) => Math.max(0, prev - 1));
-        showInfoToast("Post unliked");
-      } else {
-        await likePost(post._id);
-        setIsLiked(true);
-        setLikeCount((prev) => prev + 1);
-        showSuccessToast("Post liked");
-      }
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      showErrorToast("Failed to update like status");
-    }
+    // Use the standardized helper function
+    await togglePostLike(post, isLiked, setIsLiked, setLikeCount, user);
   };
 
   const handleDeletePost = async () => {
@@ -97,14 +84,15 @@ const PostCard = ({ post }) => {
     }
   };
 
-  const generateSharedLink = () => {
-    return `${
-      process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin
-    }/posts/${post?._id}`;
-  };
-
-  const handleShare = (platform) => {
-    showSuccessToast(`Post shared on ${platform}`);
+  const handleShare = async (platform) => {
+    // Use the standardized helper function
+    await sharePost(
+      post._id,
+      platform,
+      setShareCount,
+      user,
+      setIsShareDialogOpen
+    );
   };
 
   const formatDate = (dateString) => {
@@ -262,7 +250,9 @@ const PostCard = ({ post }) => {
                 <div className="flex flex-col space-y-4">
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       window.open(
                         `https://www.facebook.com/sharer/sharer.php?u=${url}`,
                         "_blank"
@@ -275,7 +265,9 @@ const PostCard = ({ post }) => {
                   </Button>
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       const text = encodeURIComponent(
                         post?.content || "Check out this post!"
                       );
@@ -291,7 +283,9 @@ const PostCard = ({ post }) => {
                   </Button>
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       window.open(
                         `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
                         "_blank"
@@ -304,7 +298,9 @@ const PostCard = ({ post }) => {
                   </Button>
                   <Button
                     onClick={() => {
-                      navigator.clipboard.writeText(generateSharedLink());
+                      navigator.clipboard.writeText(
+                        generateSharedLink(post._id)
+                      );
                       showSuccessToast("Link copied to clipboard!");
                       handleShare("copy");
                       setIsShareDialogOpen(false);

@@ -742,6 +742,14 @@ const likeComment = async (req, res) => {
 // @access  Private
 const sharePost = async (req, res) => {
   try {
+    const { platform } = req.body;
+
+    // Validate platform
+    const validPlatforms = ["facebook", "twitter", "linkedin", "copy", "other"];
+    const sharePlatform = validPlatforms.includes(platform)
+      ? platform
+      : "other";
+
     // Find post
     const post = await Post.findById(req.params.id);
 
@@ -755,6 +763,13 @@ const sharePost = async (req, res) => {
     // Increment share count
     post.shareCount = (post.shareCount || 0) + 1;
 
+    // Add share record
+    post.shares.push({
+      user: req.user.id,
+      platform: sharePlatform,
+      createdAt: new Date(),
+    });
+
     // Save post
     await post.save();
 
@@ -763,6 +778,7 @@ const sharePost = async (req, res) => {
       message: "Post shared successfully",
       data: {
         shareCount: post.shareCount,
+        platform: sharePlatform,
       },
     });
   } catch (error) {

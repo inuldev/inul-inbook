@@ -14,6 +14,12 @@ import {
   // Edit, // Will be used in the future
 } from "lucide-react";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import {
+  togglePostLike,
+  addPostComment,
+  sharePost,
+  generateSharedLink,
+} from "@/lib/postInteractionHelpers";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -180,12 +186,6 @@ const MediaCard = ({
   ]);
 
   const handleLikeToggle = async () => {
-    // Check if user is logged in
-    if (!user || !user._id) {
-      showErrorToast("Please log in to like posts");
-      return;
-    }
-
     // If custom handler is provided, use it
     if (customHandlers?.handleLikeToggle) {
       customHandlers.handleLikeToggle();
@@ -194,63 +194,8 @@ const MediaCard = ({
       return;
     }
 
-    try {
-      // Toggle the like state immediately for better UX
-      const newLikedState = !isLiked;
-
-      // Update UI immediately
-      setIsLiked(newLikedState);
-      setLikeCount((prev) =>
-        newLikedState ? prev + 1 : Math.max(0, prev - 1)
-      );
-
-      // Make the API call
-      const endpoint = newLikedState ? "like" : "unlike";
-      const response = await fetch(
-        `${config.backendUrl}/api/posts/${post._id}/${endpoint}`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (
-        data.success ||
-        (newLikedState && data.message === "Post already liked") ||
-        (!newLikedState && data.message === "Post not liked")
-      ) {
-        // Success - show toast
-        showSuccessToast(newLikedState ? "Post liked" : "Post unliked");
-
-        // Update the post in the global store
-        const postStore = usePostStore.getState();
-        postStore.updatePostInStore({
-          ...post,
-          isLiked: newLikedState,
-          likeCount: newLikedState
-            ? post.likeCount + 1
-            : Math.max(0, post.likeCount - 1),
-        });
-      } else {
-        // API call failed - revert UI changes
-        setIsLiked(!newLikedState);
-        setLikeCount((prev) =>
-          !newLikedState ? prev + 1 : Math.max(0, prev - 1)
-        );
-        showErrorToast("Failed to update like status");
-      }
-    } catch (error) {
-      // Error - revert UI changes
-      setIsLiked(!isLiked);
-      setLikeCount((prev) => (isLiked ? prev + 1 : Math.max(0, prev - 1)));
-      console.error("Error in like toggle:", error);
-      showErrorToast("An unexpected error occurred");
-    }
+    // Use the standardized helper function
+    await togglePostLike(post, isLiked, setIsLiked, setLikeCount, user);
   };
 
   const handleDeletePost = async () => {
@@ -267,100 +212,65 @@ const MediaCard = ({
   };
 
   const handleAddComment = async () => {
-    // Check if user is logged in
-    if (!user || !user._id) {
-      showErrorToast("Please log in to comment");
-      return;
-    }
+    // Check if already submitting or comment is empty
+    if (isSubmitting || !commentText.trim()) return;
 
-    // Check if comment is empty or already submitting
-    if (!commentText.trim() || isSubmitting) return;
+    // Store for potential error recovery
+    const tempCommentText = commentText.trim();
 
-    // Optimistically update UI
-    setIsSubmitting(true);
-    const tempCommentText = commentText.trim(); // Store for API call
-    setCommentText(""); // Clear input immediately for better UX
+    // If custom handler is provided, use it
+    if (customHandlers?.handleAddComment) {
+      try {
+        setIsSubmitting(true);
+        setCommentText(""); // Clear input immediately for better UX
 
-    try {
-      // If custom handler is provided, use it
-      if (customHandlers?.handleAddComment) {
         await customHandlers.handleAddComment(tempCommentText);
 
         if (commentInputRef.current) {
           commentInputRef.current.focus();
         }
         showSuccessToast("Comment added");
-        return;
+      } catch (error) {
+        console.error("Error adding comment:", error);
+        showErrorToast("Failed to add comment");
+        setCommentText(tempCommentText); // Restore on error
+      } finally {
+        setIsSubmitting(false);
       }
+      return;
+    }
 
-      // Default behavior - direct approach
-      const postStore = usePostStore.getState();
-
-      // Make the API call to add a comment
-      const response = await fetch(
-        `${config.backendUrl}/api/posts/${post._id}/comment`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ text: tempCommentText }),
-          timeout: config.apiTimeouts.medium,
-        }
-      );
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.message || "Failed to add comment");
-      }
-
-      // Fetch the updated post to get all comments
-      const updatedResponse = await fetch(
-        `${config.backendUrl}/api/posts/${post._id}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: config.apiTimeouts.medium,
-        }
-      );
-
-      const updatedData = await updatedResponse.json();
-
-      if (updatedData.success) {
-        // Process the updated post
-        const updatedPost = postStore.processPost(updatedData.data, user);
-
-        // Update the post in the store
+    // Use the standardized helper function
+    await addPostComment(
+      post._id,
+      commentText,
+      setCommentText,
+      (newComment) => {
+        // Update comments in the post
+        const postStore = usePostStore.getState();
+        const updatedPost = {
+          ...post,
+          comments: post.comments
+            ? [newComment, ...post.comments]
+            : [newComment],
+          commentCount: (post.commentCount || 0) + 1,
+        };
         postStore.updatePostInStore(updatedPost);
-
-        // Update local state
-        setCommentCount(updatedPost.commentCount);
 
         // Show comments if they're not already visible
         if (!showComments) {
           setShowComments(true);
         }
-      }
 
-      // Focus back on the input for easy commenting
-      if (commentInputRef.current) {
-        commentInputRef.current.focus();
-      }
-
-      showSuccessToast("Comment added");
-    } catch (error) {
-      console.error("Error adding comment:", error);
-      showErrorToast("Failed to add comment. Please try again.");
-      // Restore the comment text if there was an error
-      setCommentText(tempCommentText);
-    } finally {
-      setIsSubmitting(false);
-    }
+        // Focus back on the input for easy commenting
+        if (commentInputRef.current) {
+          commentInputRef.current.focus();
+        }
+      },
+      setCommentCount,
+      user,
+      setIsSubmitting
+    );
   };
 
   // Toggle comments visibility with data fetching
@@ -422,87 +332,22 @@ const MediaCard = ({
     setShowComments(!showComments);
   };
 
-  const generateSharedLink = () => {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
-    return `${baseUrl}/posts/${post?._id}`;
-  };
-
   const handleShare = async (platform) => {
-    // Check if user is logged in
-    if (!user || !user._id) {
-      showErrorToast("Please log in to share posts");
+    // If custom handler is provided, use it
+    if (customHandlers?.handleShare) {
+      customHandlers.handleShare(platform);
+      showSuccessToast(`Post shared on ${platform}`);
       return;
     }
 
-    // Optimistically update UI
-    setShareCount((prev) => prev + 1);
-
-    try {
-      // If custom handler is provided, use it
-      if (customHandlers?.handleShare) {
-        customHandlers.handleShare(platform);
-        showSuccessToast(`Post shared on ${platform}`);
-        return;
-      }
-
-      // Default behavior - direct approach
-      // Make the API call to share the post
-      const response = await fetch(
-        `${config.backendUrl}/api/posts/${post._id}/share`,
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ platform }),
-          timeout: config.apiTimeouts.short,
-        }
-      );
-
-      const data = await response.json();
-
-      if (data.success) {
-        showSuccessToast(`Post shared on ${platform}`);
-
-        // Fetch the updated post to get the latest share count
-        const updatedResponse = await fetch(
-          `${config.backendUrl}/api/posts/${post._id}`,
-          {
-            method: "GET",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            timeout: config.apiTimeouts.medium,
-          }
-        );
-
-        const updatedData = await updatedResponse.json();
-
-        if (updatedData.success) {
-          // Process the updated post
-          const postStore = usePostStore.getState();
-          const updatedPost = postStore.processPost(updatedData.data, user);
-
-          // Update the post in the store
-          postStore.updatePostInStore(updatedPost);
-
-          // Update local state
-          setShareCount(updatedPost.shareCount);
-        }
-      } else {
-        // Revert UI changes on error
-        setShareCount((prev) => Math.max(0, prev - 1));
-        showErrorToast(data.message || "Failed to share post");
-      }
-    } catch (error) {
-      // Revert UI changes on error
-      setShareCount((prev) => Math.max(0, prev - 1));
-      console.error("Error sharing post:", error);
-      showErrorToast("Failed to share post");
-    }
+    // Use the standardized helper function
+    await sharePost(
+      post._id,
+      platform,
+      setShareCount,
+      user,
+      setIsShareDialogOpen
+    );
   };
 
   // Helper function to format dates consistently
@@ -693,7 +538,9 @@ const MediaCard = ({
                 <div className="flex flex-col space-y-4">
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       window.open(
                         `https://www.facebook.com/sharer/sharer.php?u=${url}`,
                         "_blank"
@@ -706,7 +553,9 @@ const MediaCard = ({
                   </Button>
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       const text = encodeURIComponent(
                         post?.content || "Check out this post!"
                       );
@@ -722,7 +571,9 @@ const MediaCard = ({
                   </Button>
                   <Button
                     onClick={() => {
-                      const url = encodeURIComponent(generateSharedLink());
+                      const url = encodeURIComponent(
+                        generateSharedLink(post._id)
+                      );
                       window.open(
                         `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
                         "_blank"
@@ -735,7 +586,9 @@ const MediaCard = ({
                   </Button>
                   <Button
                     onClick={() => {
-                      navigator.clipboard.writeText(generateSharedLink());
+                      navigator.clipboard.writeText(
+                        generateSharedLink(post._id)
+                      );
                       showSuccessToast("Link copied to clipboard!");
                       handleShare("copy");
                       setIsShareDialogOpen(false);
@@ -798,7 +651,10 @@ const MediaCard = ({
                   </div>
 
                   <ScrollArea className="h-[300px] pr-4">
-                    <MediaComments comments={post?.comments} />
+                    <MediaComments
+                      comments={post?.comments}
+                      postId={post?._id}
+                    />
                   </ScrollArea>
                 </div>
               </motion.div>
