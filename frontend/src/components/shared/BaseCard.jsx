@@ -14,7 +14,8 @@
  * - Action menu (edit, delete)
  */
 
-import { format } from "date-fns";
+// import { format } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -286,11 +287,8 @@ const BaseCard = ({
       if (onDelete) {
         onDelete(post._id);
       }
-
-      showSuccessToast("Post deleted successfully");
     } catch (error) {
       console.error("Error deleting post:", error);
-      showErrorToast("Failed to delete post");
     } finally {
       setIsDeleting(false);
     }
@@ -348,8 +346,8 @@ const BaseCard = ({
                   <Clock className="h-4 w-4 mr-1" />
                   <span className="text-sm">
                     {post?.createdAt
-                      ? format(new Date(post.createdAt), "MMM dd, yyyy")
-                      : "Unknown date"}
+                      ? formatDate(post.createdAt)
+                      : "Tanggal tidak diketahui"}
                   </span>
                 </div>
               </div>

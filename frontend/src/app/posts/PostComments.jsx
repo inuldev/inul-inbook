@@ -2,12 +2,13 @@
 
 /**
  * PostComments Component
- * 
+ *
  * A component for displaying comments on posts.
  */
 
 import React, { useState } from "react";
-import { format } from "date-fns";
+// import { format } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import { MoreHorizontal, ThumbsUp, Reply, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import userStore from "@/store/userStore";
-import { toggleCommentLike, deleteComment, replyToComment } from "@/lib/commentInteractionHelpers";
+import {
+  toggleCommentLike,
+  deleteComment,
+  replyToComment,
+} from "@/lib/commentInteractionHelpers";
 
 /**
  * PostComments Component
@@ -194,8 +199,8 @@ const CommentItem = ({ comment, postId, currentUser }) => {
           </button>
           <span className="text-gray-500 dark:text-gray-400">
             {comment?.createdAt
-              ? format(new Date(comment.createdAt), "MMM dd, yyyy")
-              : "Unknown date"}
+              ? formatDate(comment.createdAt)
+              : "Tanggal tidak diketahui"}
           </span>
         </div>
 
@@ -261,11 +266,8 @@ const CommentItem = ({ comment, postId, currentUser }) => {
                       <div className="flex items-center mt-1 space-x-2 text-xs">
                         <span className="text-gray-500 dark:text-gray-400">
                           {reply?.createdAt
-                            ? format(
-                                new Date(reply.createdAt),
-                                "MMM dd, yyyy"
-                              )
-                            : "Unknown date"}
+                            ? formatDate(reply.createdAt)
+                            : "Tanggal tidak diketahui"}
                         </span>
                       </div>
                     </div>

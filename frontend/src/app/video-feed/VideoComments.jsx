@@ -7,7 +7,8 @@
  */
 
 import React, { useState } from "react";
-import { format } from "date-fns";
+// import { format } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import { MoreHorizontal, ThumbsUp, Reply, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -62,8 +63,8 @@ const VideoComments = ({ comments }) => {
               </Button>
               <span>
                 {comment?.createdAt
-                  ? new Date(comment.createdAt).toLocaleString()
-                  : "Unknown time"}
+                  ? formatTanggalWaktu(comment.createdAt)
+                  : "Waktu tidak diketahui"}
               </span>
             </div>
           </div>

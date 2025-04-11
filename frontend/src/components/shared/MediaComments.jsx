@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { format } from "date-fns";
+// import { format } from "date-fns";
+import { formatDate } from "@/lib/utils";
 import {
   ChevronDown,
   ChevronUp,
@@ -70,10 +71,10 @@ const MediaComments = ({ comments, postId }) => {
     }
   }, [comments, user?._id]);
 
-  const formatDate = (dateString) => {
+  const formatCommentDate = (dateString) => {
     if (!dateString) return "";
     try {
-      return format(new Date(dateString), "MMM d, yyyy 'at' h:mm a");
+      return formatDate(dateString);
     } catch (error) {
       return dateString;
     }
@@ -159,7 +160,9 @@ const MediaComments = ({ comments, postId }) => {
                     Delete
                   </Button>
                 )}
-                <span className="ml-2">{formatDate(comment?.createdAt)}</span>
+                <span className="ml-2">
+                  {formatCommentDate(comment?.createdAt)}
+                </span>
               </div>
             </div>
           </div>
@@ -219,7 +222,7 @@ const MediaComments = ({ comments, postId }) => {
                       </div>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <span className="text-xs text-gray-400">
-                          {formatDate(reply?.createdAt)}
+                          {formatCommentDate(reply?.createdAt)}
                         </span>
                         {user?._id === reply?.user?._id && (
                           <Button

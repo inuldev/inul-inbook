@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { formatDateInDDMMYYY } from "@/lib/utils";
+import { formatDateInDDMMYYY, formatTanggal } from "@/lib/utils";
 import { usePostStore } from "@/store/usePostStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
@@ -190,7 +190,7 @@ const ProfileDetails = ({
               <div className="flex items-center">
                 <Cake className="w-5 h-5 mr-2" />
                 <span>
-                  Birthday: {formatDateInDDMMYYY(profileData?.dateOfBirth)}
+                  Ulang Tahun: {formatTanggal(profileData?.dateOfBirth)}
                 </span>
               </div>
             </div>
