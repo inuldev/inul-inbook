@@ -107,9 +107,11 @@ function AuthProviderCore({ searchParams, pathname, children }) {
           // Try to set a fallback cookie and retry
           if (typeof document !== "undefined") {
             console.log("Setting fallback auth_status cookie");
-            document.cookie =
-              "auth_status=logged_in; path=/; max-age=2592000; SameSite=Lax" +
-              (window.location.protocol === "https:" ? "; Secure" : "");
+            // Always set Secure for SameSite=None, and use Lax with Secure for HTTPS
+            const isHttps = window.location.protocol === "https:";
+            document.cookie = isHttps
+              ? "auth_status=logged_in; path=/; max-age=2592000; SameSite=None; Secure"
+              : "auth_status=logged_in; path=/; max-age=2592000; SameSite=Lax";
 
             // Check if cookie was set
             const cookieSet = document.cookie.includes("auth_status=");

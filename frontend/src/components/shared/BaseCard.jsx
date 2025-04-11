@@ -395,10 +395,14 @@ const BaseCard = ({
               {post.mediaType === "image" ? (
                 <div className="flex items-center justify-center">
                   <img
-                    src={post?.mediaUrl}
+                    src={`${post?.mediaUrl}?_=${Date.now()}`}
                     alt="post_image"
                     className="w-full h-auto object-contain max-h-[500px]"
                     loading="lazy"
+                    onError={(e) => {
+                      console.error("Image loading error:", e);
+                      e.target.src = post?.mediaUrl; // Try without cache busting
+                    }}
                   />
                 </div>
               ) : (
@@ -408,8 +412,13 @@ const BaseCard = ({
                       controls
                       className="w-full object-contain max-h-[500px]"
                       preload="metadata"
+                      src={`${post?.mediaUrl}?_=${Date.now()}`}
+                      type="video/mp4"
+                      onError={(e) => {
+                        console.error("Video loading error:", e);
+                        e.target.src = post?.mediaUrl; // Try without cache busting
+                      }}
                     >
-                      <source src={post?.mediaUrl} type="video/mp4" />
                       Your browser does not support the video tag
                     </video>
                   </div>

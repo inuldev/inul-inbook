@@ -19,11 +19,20 @@ const sendTokenResponse = (user, statusCode, res) => {
   const options = {
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     httpOnly: true,
-    secure: config.isProduction,
-    sameSite: config.isProduction ? "none" : "lax", // Needed for cross-site cookies in production
     path: "/", // Ensure consistent path for all cookies
     domain: undefined, // Let the browser set the domain automatically
   };
+
+  // Handle SameSite and Secure attributes based on environment
+  if (config.isProduction) {
+    // In production, use SameSite=None with Secure=true
+    options.sameSite = "none";
+    options.secure = true;
+  } else {
+    // In development, use SameSite=Lax and Secure based on protocol
+    options.sameSite = "lax";
+    options.secure = config.frontendUrl.startsWith("https");
+  }
 
   console.log("Setting auth cookie with options:", options);
   console.log("Token being set:", token.substring(0, 10) + "...");
@@ -144,22 +153,33 @@ const login = async (req, res) => {
 const logout = (req, res) => {
   try {
     // Clear the token cookie - use multiple approaches to ensure it's cleared
+    // Prepare cookie options
+    const cookieOptions = {
+      httpOnly: true,
+      path: "/", // Add path to ensure cookie is cleared properly
+    };
+
+    // Handle SameSite and Secure attributes based on environment
+    if (config.isProduction) {
+      // In production, use SameSite=None with Secure=true
+      cookieOptions.sameSite = "none";
+      cookieOptions.secure = true;
+    } else {
+      // In development, use SameSite=Lax and Secure based on protocol
+      cookieOptions.sameSite = "lax";
+      cookieOptions.secure = config.frontendUrl.startsWith("https");
+    }
+
     // Method 1: Set to 'none' with short expiry
     res.cookie("token", "none", {
+      ...cookieOptions,
       expires: new Date(Date.now() + 1000), // 1 second
-      httpOnly: true,
-      secure: config.isProduction,
-      sameSite: config.isProduction ? "none" : "lax",
-      path: "/", // Add path to ensure cookie is cleared properly
     });
 
     // Method 2: Set empty value with expired date
     res.cookie("token", "", {
+      ...cookieOptions,
       expires: new Date(0),
-      httpOnly: true,
-      secure: config.isProduction,
-      sameSite: config.isProduction ? "none" : "lax",
-      path: "/",
     });
 
     console.log("Logout successful, cookie cleared");
@@ -241,10 +261,19 @@ const handleGoogleCallback = (req, res) => {
     const cookieOptions = {
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       httpOnly: true,
-      secure: isProduction, // Only set secure in production or if frontend uses HTTPS
-      sameSite: isProduction ? "none" : "lax", // Required for cross-site cookies in production
       path: "/",
     };
+
+    // Handle SameSite and Secure attributes based on environment
+    if (isProduction) {
+      // In production, use SameSite=None with Secure=true
+      cookieOptions.sameSite = "none";
+      cookieOptions.secure = true;
+    } else {
+      // In development, use SameSite=Lax and Secure based on protocol
+      cookieOptions.sameSite = "lax";
+      cookieOptions.secure = config.frontendUrl.startsWith("https");
+    }
 
     // Log the environment and cookie settings
     console.log("Environment settings:", {
@@ -267,10 +296,12 @@ const handleGoogleCallback = (req, res) => {
     // This helps with some browser compatibility issues
     if (isProduction) {
       try {
+        // For fallback cookie, always use Secure=true with SameSite=Lax
         res.cookie("auth_fallback", "true", {
           ...cookieOptions,
           httpOnly: false,
           sameSite: "lax", // More compatible setting
+          secure: true, // Always secure in production
         });
       } catch (cookieError) {
         console.error("Error setting fallback cookie:", cookieError);

@@ -112,12 +112,19 @@ const CloudinaryUploader = ({
         `social-media-app/${uploadType === "post" ? "posts" : "stories"}`
       );
 
+      // Explicitly set resource_type based on file type
+      const resourceType = isImage ? "image" : "video";
+      formData.append("resource_type", resourceType);
+
       // Create XMLHttpRequest to track upload progress
       const xhr = new XMLHttpRequest();
       xhr.open(
         "POST",
-        `https://api.cloudinary.com/v1_1/${signatureData.data.cloudName}/auto/upload`
+        `https://api.cloudinary.com/v1_1/${signatureData.data.cloudName}/${resourceType}/upload`
       );
+
+      // Set timeout (60 seconds for large files)
+      xhr.timeout = 60000;
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -155,7 +162,24 @@ const CloudinaryUploader = ({
       };
 
       xhr.onerror = function () {
-        throw new Error("Upload failed");
+        console.error("Cloudinary upload failed", xhr.status, xhr.responseText);
+        setError("Upload failed. Please try again.");
+        setUploading(false);
+        if (onUploadError) {
+          onUploadError("Upload failed. Please try again.");
+        }
+      };
+
+      // Add timeout handler
+      xhr.ontimeout = function () {
+        console.error("Cloudinary upload timed out");
+        setError(
+          "Upload timed out. Please try again with a smaller file or better connection."
+        );
+        setUploading(false);
+        if (onUploadError) {
+          onUploadError("Upload timed out. Please try again.");
+        }
       };
 
       xhr.send(formData);
