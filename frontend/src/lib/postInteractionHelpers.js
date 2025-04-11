@@ -1,9 +1,9 @@
 /**
  * Post Interaction Helpers
- * 
+ *
  * This module provides helper functions for post interactions (like, comment, share)
  * that can be used across different components.
- * 
+ *
  * These functions are designed to:
  * 1. Provide a consistent interface for post interactions
  * 2. Handle optimistic updates for better UX
@@ -13,7 +13,11 @@
 
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
-import { showSuccessToast, showErrorToast, showInfoToast } from "@/lib/toastUtils";
+import {
+  showSuccessToast,
+  showErrorToast,
+  showInfoToast,
+} from "@/lib/toastUtils";
 
 /**
  * Toggle like status for a post
@@ -39,7 +43,7 @@ export const togglePostLike = async (
 
     // Toggle the like state immediately for better UX
     const newLikedState = !isLiked;
-    
+
     // Update UI immediately (optimistic update)
     setIsLiked(newLikedState);
     setLikeCount((prev) => (newLikedState ? prev + 1 : Math.max(0, prev - 1)));
@@ -48,11 +52,15 @@ export const togglePostLike = async (
     const postStore = usePostStore.getState();
     const result = await postStore.togglePostLike(postId);
 
+    // Log for debugging
+    console.log("Server response for like toggle:", result);
+
     // Always update UI with the state returned from the server
     setIsLiked(result.isLiked);
-    
+
     // Use the actual like count from the server if available
     if (result.likeCount !== null && result.likeCount !== undefined) {
+      console.log("Setting like count from server:", result.likeCount);
       setLikeCount(result.likeCount);
     }
 
@@ -64,10 +72,10 @@ export const togglePostLike = async (
     }
   } catch (error) {
     console.error("Error toggling post like:", error);
-    
+
     // Revert UI changes on error
     setIsLiked(isLiked);
-    
+
     // Show error message
     showErrorToast(error.message || "Failed to update like status");
   }
@@ -106,7 +114,7 @@ export const addPostComment = async (
 
     // Set submitting state
     if (setIsSubmitting) setIsSubmitting(true);
-    
+
     // Store comment text and clear input immediately for better UX
     const tempCommentText = commentText.trim();
     setCommentText("");
@@ -127,10 +135,10 @@ export const addPostComment = async (
     showSuccessToast("Comment added");
   } catch (error) {
     console.error("Error adding comment:", error);
-    
+
     // Show error message
     showErrorToast(error.message || "Failed to add comment");
-    
+
     // Restore comment text on error
     setCommentText(commentText);
   } finally {
@@ -177,10 +185,10 @@ export const sharePost = async (
     showSuccessToast(`Post shared on ${platform}`);
   } catch (error) {
     console.error("Error sharing post:", error);
-    
+
     // Revert UI changes on error
     setShareCount((prev) => Math.max(0, prev - 1));
-    
+
     // Show error message
     showErrorToast(error.message || "Failed to share post");
   }
@@ -192,6 +200,7 @@ export const sharePost = async (
  * @returns {string} - The shareable link
  */
 export const generateSharedLink = (postId) => {
-  const baseUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
   return `${baseUrl}/posts/${postId}`;
 };

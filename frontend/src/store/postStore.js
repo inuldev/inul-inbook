@@ -1,6 +1,6 @@
 /**
  * Post Store - Manages all post-related state and operations
- * 
+ *
  * This store handles:
  * - Fetching, creating, updating, and deleting posts
  * - Post interactions (like, comment, share)
@@ -57,7 +57,7 @@ const usePostStore = create((set, get) => ({
 
       // Process posts to ensure consistent format
       const currentUser = userStore.getState().user;
-      const processedPosts = data.data.map(post => 
+      const processedPosts = data.data.map((post) =>
         get().processPost(post, currentUser)
       );
 
@@ -66,7 +66,7 @@ const usePostStore = create((set, get) => ({
         pagination: data.pagination,
         loading: false,
       });
-      
+
       return processedPosts;
     } catch (error) {
       console.error("Error fetching posts:", error);
@@ -104,7 +104,7 @@ const usePostStore = create((set, get) => ({
 
       // Process posts to ensure consistent format
       const currentUser = userStore.getState().user;
-      const processedPosts = data.data.map(post => 
+      const processedPosts = data.data.map((post) =>
         get().processPost(post, currentUser)
       );
 
@@ -113,7 +113,7 @@ const usePostStore = create((set, get) => ({
         pagination: data.pagination,
         loading: false,
       });
-      
+
       return processedPosts;
     } catch (error) {
       console.error("Error fetching feed posts:", error);
@@ -130,17 +130,14 @@ const usePostStore = create((set, get) => ({
   fetchPost: async (postId) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(
-        `${config.backendUrl}/api/posts/${postId}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: config.apiTimeouts.medium,
-        }
-      );
+      const response = await fetch(`${config.backendUrl}/api/posts/${postId}`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: config.apiTimeouts.medium,
+      });
 
       const data = await response.json();
 
@@ -154,12 +151,12 @@ const usePostStore = create((set, get) => ({
 
       // Update the post in the store if it exists
       set((state) => ({
-        posts: state.posts.map(post => 
+        posts: state.posts.map((post) =>
           post._id === postId ? processedPost : post
         ),
         loading: false,
       }));
-      
+
       return processedPost;
     } catch (error) {
       console.error(`Error fetching post ${postId}:`, error);
@@ -242,7 +239,9 @@ const usePostStore = create((set, get) => ({
       const signatureData = await signatureResponse.json();
 
       if (!signatureData.success) {
-        throw new Error(signatureData.message || "Failed to get upload signature");
+        throw new Error(
+          signatureData.message || "Failed to get upload signature"
+        );
       }
 
       // Prepare form data for Cloudinary
@@ -266,7 +265,9 @@ const usePostStore = create((set, get) => ({
       const cloudinaryData = await cloudinaryResponse.json();
 
       if (cloudinaryResponse.status !== 200) {
-        throw new Error(cloudinaryData.error?.message || "Failed to upload media");
+        throw new Error(
+          cloudinaryData.error?.message || "Failed to upload media"
+        );
       }
 
       // Create post with the uploaded media URL
@@ -294,7 +295,10 @@ const usePostStore = create((set, get) => ({
 
       // Process post to ensure consistent format
       const currentUser = userStore.getState().user;
-      const processedPost = get().processPost(postResponseData.data, currentUser);
+      const processedPost = get().processPost(
+        postResponseData.data,
+        currentUser
+      );
 
       set((state) => ({
         posts: [processedPost, ...state.posts],
@@ -421,18 +425,18 @@ const usePostStore = create((set, get) => ({
       );
 
       const checkData = await checkResponse.json();
-      
+
       if (!checkData.success) {
         throw new Error("Failed to get post state");
       }
-      
+
       // Get the actual current like state from the server
       const actualIsLiked = checkData.data.likes.includes(currentUser._id);
-      
+
       // Determine the action based on the ACTUAL server state
       const endpoint = actualIsLiked ? "unlike" : "like";
       const newLikedState = !actualIsLiked;
-      
+
       // Make the API call
       const response = await fetch(
         `${config.backendUrl}/api/posts/${postId}/${endpoint}`,
@@ -519,11 +523,25 @@ const usePostStore = create((set, get) => ({
         return { posts: updatedPosts };
       });
 
+      // Get the final like count from the updated post
+      const currentState = get();
+      const updatedPost = currentState.posts.find((p) => p._id === postId);
+      const finalLikeCount = updatedPost
+        ? updatedPost.likeCount
+        : actualLikeCount || (newLikedState ? 1 : 0);
+
+      console.log("Final like state in store:", {
+        postId,
+        isLiked: newLikedState,
+        likeCount: finalLikeCount,
+        actualLikeCount,
+      });
+
       // Return the new state and the actual like count
       return {
         success: true,
         isLiked: newLikedState,
-        likeCount: actualLikeCount,
+        likeCount: finalLikeCount,
       };
     } catch (error) {
       console.error("Error toggling post like:", error);
@@ -590,24 +608,27 @@ const usePostStore = create((set, get) => ({
       // Update the post in the store
       set((state) => {
         const existingPost = state.posts.find((p) => p._id === postId);
-        
+
         if (existingPost) {
           // Add the new comment to the post
-          const updatedComments = [newComment, ...(existingPost.comments || [])];
-          
+          const updatedComments = [
+            newComment,
+            ...(existingPost.comments || []),
+          ];
+
           // Make sure we don't have duplicates
           const uniqueComments = updatedComments.filter(
             (comment, index, self) =>
               index === self.findIndex((c) => c._id === comment._id)
           );
-          
+
           // Update the post with the new comment
           const updatedPost = {
             ...existingPost,
             comments: uniqueComments,
             commentCount: (existingPost.commentCount || 0) + 1,
           };
-          
+
           // Update the posts array
           return {
             posts: state.posts.map((post) =>
@@ -615,7 +636,7 @@ const usePostStore = create((set, get) => ({
             ),
           };
         }
-        
+
         return state;
       });
 
@@ -673,20 +694,20 @@ const usePostStore = create((set, get) => ({
       // Update the post in the store
       set((state) => {
         const existingPost = state.posts.find((p) => p._id === postId);
-        
+
         if (existingPost) {
           const updatedPost = {
             ...existingPost,
             shareCount: data.data.shareCount,
           };
-          
+
           return {
             posts: state.posts.map((post) =>
               post._id === postId ? updatedPost : post
             ),
           };
         }
-        
+
         return state;
       });
 
@@ -727,7 +748,7 @@ const usePostStore = create((set, get) => ({
 
       // Process posts to ensure consistent format
       const currentUser = userStore.getState().user;
-      const processedPosts = data.data.map(post => 
+      const processedPosts = data.data.map((post) =>
         get().processPost(post, currentUser)
       );
 
@@ -752,11 +773,11 @@ const usePostStore = create((set, get) => ({
   addPost: (post) => {
     const currentUser = userStore.getState().user;
     const processedPost = get().processPost(post, currentUser);
-    
+
     set((state) => ({
       posts: [processedPost, ...state.posts],
     }));
-    
+
     return processedPost;
   },
 
@@ -816,13 +837,13 @@ const usePostStore = create((set, get) => ({
   updatePostInStore: (updatedPost) => {
     const currentUser = userStore.getState().user;
     const processedPost = get().processPost(updatedPost, currentUser);
-    
+
     set((state) => ({
       posts: state.posts.map((post) =>
         post._id === processedPost._id ? processedPost : post
       ),
     }));
-    
+
     return processedPost;
   },
 

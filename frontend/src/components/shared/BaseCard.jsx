@@ -2,10 +2,10 @@
 
 /**
  * BaseCard Component
- * 
+ *
  * A base component for displaying content cards (posts, videos, stories)
  * with consistent styling and behavior.
- * 
+ *
  * This component handles:
  * - User information display
  * - Content rendering
@@ -61,7 +61,7 @@ import {
   addPostComment,
   sharePost,
   generateSharedLink,
-} from "@/lib/postInteractionHelpers.new";
+} from "@/lib/postInteractionHelpers";
 
 /**
  * BaseCard Component
@@ -87,7 +87,7 @@ const BaseCard = ({
   // Get user from store
   const { user } = userStore();
   const { deletePost } = usePostStore();
-  
+
   // Local state
   const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -99,7 +99,7 @@ const BaseCard = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Refs
   const commentInputRef = useRef(null);
 
@@ -173,22 +173,9 @@ const BaseCard = ({
         return;
       }
 
-      // Toggle the like state immediately for better UX
-      const newLikedState = !isLiked;
-      
-      // Update UI immediately
-      setIsLiked(newLikedState);
-      setLikeCount((prev) =>
-        newLikedState ? prev + 1 : Math.max(0, prev - 1)
-      );
-
       // Use the standardized helper function
-      await togglePostLike(
-        post._id,
-        isLiked,
-        setIsLiked,
-        setLikeCount
-      );
+      // Note: We don't do optimistic update here because the helper function already does it
+      await togglePostLike(post._id, isLiked, setIsLiked, setLikeCount);
     } catch (error) {
       console.error("Error toggling like:", error);
       showErrorToast("Failed to update like status");
@@ -215,11 +202,11 @@ const BaseCard = ({
     if (!post.comments || post.comments.length === 0) {
       try {
         setIsSubmitting(true);
-        
+
         // Fetch post with comments
         const postStore = usePostStore.getState();
         const processedPost = await postStore.fetchPost(post._id);
-        
+
         // Update comment count
         if (processedPost.comments) {
           setCommentCount(
@@ -275,12 +262,7 @@ const BaseCard = ({
     }
 
     // Use the standardized helper function
-    await sharePost(
-      post._id,
-      platform,
-      setShareCount,
-      setIsShareDialogOpen
-    );
+    await sharePost(post._id, platform, setShareCount, setIsShareDialogOpen);
   };
 
   /**
@@ -295,16 +277,16 @@ const BaseCard = ({
 
     try {
       setIsDeleting(true);
-      
+
       // Delete the post
       const postStore = usePostStore.getState();
       await postStore.deletePost(post._id);
-      
+
       // Call the callback if provided
       if (onDelete) {
         onDelete(post._id);
       }
-      
+
       showSuccessToast("Post deleted successfully");
     } catch (error) {
       console.error("Error deleting post:", error);
@@ -326,7 +308,7 @@ const BaseCard = ({
 
     // Open edit form
     setIsEditFormOpen(true);
-    
+
     // Call the callback if provided
     if (onEdit) {
       onEdit(post);
