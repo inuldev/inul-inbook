@@ -75,8 +75,21 @@ const CloudinaryUploader = ({
       setUploading(true);
       setProgress(10);
 
+      // Determine file type
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+
+      // Validate file type
+      if (!isImage && !isVideo) {
+        setError("Only images and videos are allowed");
+        setUploading(false);
+        return;
+      }
+
       // Get upload signature from backend
       const publicId = `${uploadType}_${Date.now()}`;
+      const fileResourceType = isImage ? "image" : "video";
+
       const signatureResponse = await fetch(
         `${config.backendUrl}/api/${
           uploadType === "post" ? "posts" : "stories"
@@ -87,7 +100,10 @@ const CloudinaryUploader = ({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ publicId }),
+          body: JSON.stringify({
+            publicId,
+            resourceType: fileResourceType,
+          }),
           timeout: config.apiTimeouts.short,
         }
       );
@@ -112,9 +128,19 @@ const CloudinaryUploader = ({
         `social-media-app/${uploadType === "post" ? "posts" : "stories"}`
       );
 
-      // Explicitly set resource_type based on file type
-      const resourceType = isImage ? "image" : "video";
+      // Use the resource_type from the signature data
+      const resourceType =
+        signatureData.data.resourceType || (isImage ? "image" : "video");
       formData.append("resource_type", resourceType);
+
+      console.log("Uploading to Cloudinary:", {
+        fileType: file.type,
+        isImage,
+        isVideo,
+        resourceType: resourceType,
+        publicId,
+        url: `https://api.cloudinary.com/v1_1/${signatureData.data.cloudName}/${resourceType}/upload`,
+      });
 
       // Create XMLHttpRequest to track upload progress
       const xhr = new XMLHttpRequest();
@@ -137,6 +163,7 @@ const CloudinaryUploader = ({
       xhr.onload = function () {
         if (xhr.status === 200) {
           const response = JSON.parse(xhr.responseText);
+          console.log("Cloudinary upload success:", response);
           setProgress(100);
 
           // Call the callback with the uploaded file data
@@ -156,8 +183,21 @@ const CloudinaryUploader = ({
             setProgress(0);
           }, 1000);
         } else {
-          const error = JSON.parse(xhr.responseText);
-          throw new Error(error.error.message);
+          try {
+            const error = JSON.parse(xhr.responseText);
+            console.error("Cloudinary upload error:", error);
+            setError(error.error?.message || "Upload failed");
+          } catch (e) {
+            console.error(
+              "Error parsing Cloudinary response:",
+              xhr.responseText
+            );
+            setError("Upload failed: " + xhr.status);
+          }
+          setUploading(false);
+          if (onUploadError) {
+            onUploadError("Upload failed");
+          }
         }
       };
 

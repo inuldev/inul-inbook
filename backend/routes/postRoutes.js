@@ -35,7 +35,7 @@ router.post("/", protect, postUpload.single("media"), createPost);
 router.post("/direct", protect, createPostWithDirectUpload);
 router.post("/upload-signature", protect, (req, res) => {
   try {
-    const { publicId } = req.body;
+    const { publicId, resourceType } = req.body;
     if (!publicId) {
       return res.status(400).json({
         success: false,
@@ -43,13 +43,33 @@ router.post("/upload-signature", protect, (req, res) => {
       });
     }
 
-    const signatureData = generateSignature(publicId, "posts");
+    // Use the provided resourceType or default to "auto"
+    const validResourceType = ["image", "video", "auto"].includes(resourceType)
+      ? resourceType
+      : "auto";
+
+    // Generate signature with the appropriate resource type
+    const signatureData = generateSignature(
+      publicId,
+      "posts",
+      validResourceType
+    );
+
+    // Log the signature data in development
+    if (process.env.NODE_ENV === "development") {
+      console.log("Post upload signature data:", {
+        publicId,
+        resourceType: validResourceType,
+        timestamp: signatureData.timestamp,
+      });
+    }
 
     res.status(200).json({
       success: true,
       data: signatureData,
     });
   } catch (error) {
+    console.error("Error generating upload signature:", error);
     res.status(500).json({
       success: false,
       message: "Server error",

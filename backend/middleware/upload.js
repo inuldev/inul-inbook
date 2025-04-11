@@ -111,22 +111,38 @@ const postUpload = multer({
 });
 
 // Helper function to generate Cloudinary signature for direct uploads
-const generateSignature = (publicId, folder) => {
+const generateSignature = (publicId, folder, resourceType = "auto") => {
   const timestamp = Math.round(new Date().getTime() / 1000);
+
+  // Create params object for signature
+  const params = {
+    timestamp: timestamp,
+    public_id: publicId,
+    folder: `social-media-app/${folder}`,
+  };
+
+  // Generate signature
   const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp: timestamp,
-      public_id: publicId,
-      folder: `social-media-app/${folder}`,
-    },
+    params,
     config.cloudinary.apiSecret
   );
+
+  // Log signature details in development
+  if (config.isDevelopment) {
+    console.log("Generating Cloudinary signature:", {
+      publicId,
+      folder: `social-media-app/${folder}`,
+      resourceType,
+      timestamp,
+    });
+  }
 
   return {
     timestamp,
     signature,
     apiKey: config.cloudinary.apiKey,
     cloudName: config.cloudinary.cloudName,
+    resourceType,
   };
 };
 
