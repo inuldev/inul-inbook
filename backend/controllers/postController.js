@@ -3,17 +3,30 @@ const Comment = require("../model/Comment");
 const User = require("../model/User");
 const { cloudinary } = require("../middleware/upload");
 
-// Helper function to extract public ID from Cloudinary URL
+// Helper function to extract public ID and resource type from Cloudinary URL
 const extractPublicIdFromUrl = (url) => {
   try {
-    if (!url) return null;
+    if (!url) return { publicId: null, resourceType: null };
 
     // Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/social-media-app/posts/post_1234567890.jpg
     // or https://res.cloudinary.com/cloud-name/video/upload/v1234567890/social-media-app/posts/post_1234567890.mp4
 
+    // Determine resource type (image or video)
+    let resourceType = "image";
+    if (url.includes("/video/upload/")) {
+      resourceType = "video";
+    } else if (url.includes("/image/upload/")) {
+      resourceType = "image";
+    } else if (
+      url.toLowerCase().endsWith(".mp4") ||
+      url.toLowerCase().endsWith(".mov")
+    ) {
+      resourceType = "video";
+    }
+
     // Extract the path after /upload/
     const uploadIndex = url.indexOf("/upload/");
-    if (uploadIndex === -1) return null;
+    if (uploadIndex === -1) return { publicId: null, resourceType: null };
 
     const pathAfterUpload = url.substring(uploadIndex + 8);
 
@@ -23,10 +36,10 @@ const extractPublicIdFromUrl = (url) => {
     // Remove file extension
     const publicId = versionRemoved.replace(/\.[^/.]+$/, "");
 
-    return publicId;
+    return { publicId, resourceType };
   } catch (error) {
     console.error("Error extracting public ID:", error);
-    return null;
+    return { publicId: null, resourceType: null };
   }
 };
 
@@ -259,10 +272,16 @@ const updatePost = async (req, res) => {
       // If there was previous media, delete it from Cloudinary
       if (post.mediaUrl) {
         try {
-          const oldPublicId = extractPublicIdFromUrl(post.mediaUrl);
+          const { publicId: oldPublicId, resourceType } =
+            extractPublicIdFromUrl(post.mediaUrl);
           if (oldPublicId) {
-            await cloudinary.uploader.destroy(oldPublicId);
-            console.log(`Deleted old media from Cloudinary: ${oldPublicId}`);
+            // Use the correct resource_type for deletion
+            await cloudinary.uploader.destroy(oldPublicId, {
+              resource_type: resourceType,
+            });
+            console.log(
+              `Deleted old media from Cloudinary: ${oldPublicId} (${resourceType})`
+            );
           }
         } catch (cloudinaryError) {
           console.error(
@@ -330,10 +349,17 @@ const deletePost = async (req, res) => {
     // Delete media from Cloudinary if it exists
     if (post.mediaUrl) {
       try {
-        const publicId = extractPublicIdFromUrl(post.mediaUrl);
+        const { publicId, resourceType } = extractPublicIdFromUrl(
+          post.mediaUrl
+        );
         if (publicId) {
-          await cloudinary.uploader.destroy(publicId);
-          console.log(`Deleted media from Cloudinary: ${publicId}`);
+          // Use the correct resource_type for deletion
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+          console.log(
+            `Deleted media from Cloudinary: ${publicId} (${resourceType})`
+          );
         }
       } catch (cloudinaryError) {
         console.error("Error deleting media from Cloudinary:", cloudinaryError);
@@ -978,10 +1004,16 @@ const updatePostWithDirectUpload = async (req, res) => {
       // If there was previous media, delete it from Cloudinary
       if (post.mediaUrl) {
         try {
-          const oldPublicId = extractPublicIdFromUrl(post.mediaUrl);
+          const { publicId: oldPublicId, resourceType } =
+            extractPublicIdFromUrl(post.mediaUrl);
           if (oldPublicId) {
-            await cloudinary.uploader.destroy(oldPublicId);
-            console.log(`Deleted old media from Cloudinary: ${oldPublicId}`);
+            // Use the correct resource_type for deletion
+            await cloudinary.uploader.destroy(oldPublicId, {
+              resource_type: resourceType,
+            });
+            console.log(
+              `Deleted old media from Cloudinary: ${oldPublicId} (${resourceType})`
+            );
           }
         } catch (cloudinaryError) {
           console.error(

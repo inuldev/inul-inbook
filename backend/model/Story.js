@@ -32,7 +32,7 @@ const storySchema = new mongoose.Schema(
     },
     expiresAt: {
       type: Date,
-      default: function() {
+      default: function () {
         // Stories expire after 24 hours
         const date = new Date();
         date.setHours(date.getHours() + 24);

@@ -6,6 +6,9 @@ const passport = require("passport");
 const session = require("express-session");
 const config = require("./config/config");
 
+// Import cron jobs
+const { initCronJobs } = require("./cron");
+
 // Import route files
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -120,6 +123,10 @@ mongoose
   .connect(config.mongoUri)
   .then(() => {
     console.log("Connected to MongoDB");
+
+    // Initialize cron jobs
+    initCronJobs();
+
     // Start server
     const PORT = config.port;
     app.listen(PORT, () => {
