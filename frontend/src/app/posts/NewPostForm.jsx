@@ -1,7 +1,8 @@
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import React, { useState } from "react";
-import { ImageIcon, Video, Laugh, Plus, X, AlertCircle } from "lucide-react";
+import { ImageIcon, Video, Laugh, X, AlertCircle } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -213,11 +214,15 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
               {mediaData && (
                 <div className="mt-4 relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                   {mediaData.type === "image" ? (
-                    <img
-                      src={mediaData.url}
-                      alt="Uploaded media"
-                      className="w-full h-auto max-h-[300px] object-contain"
-                    />
+                    <div className="relative w-full h-[300px]">
+                      <Image
+                        src={mediaData.url}
+                        alt="Uploaded media"
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="object-contain"
+                      />
+                    </div>
                   ) : (
                     <video
                       src={mediaData.url}

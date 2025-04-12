@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
+import { Upload, X } from "lucide-react";
 import React, { useState, useRef } from "react";
-import { Upload, X, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -254,8 +255,8 @@ const CloudinaryUploader = ({
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-500">
             {uploadType === "post"
-              ? "Images (up to 10MB) or Videos (up to 100MB)"
-              : "Images or Videos (up to 5MB)"}
+              ? "Images (JPG, PNG, GIF, WebP up to 10MB) or Videos (up to 100MB)"
+              : "Images (JPG, PNG, GIF, WebP) or Videos (up to 5MB)"}
           </p>
           <input
             type="file"
@@ -270,11 +271,15 @@ const CloudinaryUploader = ({
           {preview && (
             <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
               {file.type.startsWith("image/") ? (
-                <img
-                  src={preview}
-                  alt="Preview"
-                  className="w-full h-full object-contain"
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={preview}
+                    alt="Preview"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-contain"
+                  />
+                </div>
               ) : (
                 <video
                   src={preview}

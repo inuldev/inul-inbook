@@ -15,9 +15,9 @@
  */
 
 // import { format } from "date-fns";
-import { formatDate } from "@/lib/utils";
-import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Clock,
   MessageCircle,
@@ -31,8 +31,8 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -41,7 +41,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -50,13 +49,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { formatDate } from "@/lib/utils";
 import userStore from "@/store/userStore";
 import usePostStore from "@/store/postStore";
-import {
-  showSuccessToast,
-  showErrorToast,
-  showInfoToast,
-} from "@/lib/toastUtils";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import {
   togglePostLike,
   addPostComment,
@@ -76,6 +72,7 @@ import {
  * @param {Function} props.onEdit - Callback when post is edited
  * @returns {React.ReactElement}
  */
+
 const BaseCard = ({
   post,
   isVideoFeed = false,
@@ -393,15 +390,21 @@ const BaseCard = ({
           {post?.mediaUrl && (
             <div className="relative rounded-lg overflow-hidden mb-4 bg-gray-100 dark:bg-gray-800">
               {post.mediaType === "image" ? (
-                <div className="flex items-center justify-center">
-                  <img
+                <div className="flex items-center justify-center relative w-full h-[500px]">
+                  <Image
                     src={`${post?.mediaUrl}?_=${Date.now()}`}
                     alt="post_image"
-                    className="w-full h-auto object-contain max-h-[500px]"
-                    loading="lazy"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-contain"
+                    priority={false}
                     onError={(e) => {
                       console.error("Image loading error:", e);
-                      e.target.src = post?.mediaUrl; // Try without cache busting
+                      // Fallback to original URL without cache busting
+                      const imgElement = e.target;
+                      if (imgElement.src !== post?.mediaUrl) {
+                        imgElement.src = post?.mediaUrl;
+                      }
                     }}
                   />
                 </div>

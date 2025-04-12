@@ -22,7 +22,7 @@ const storyStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "social-media-app/stories",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "mp4", "mov"],
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "mp4", "mov"],
     resource_type: "auto",
   },
 });
@@ -42,7 +42,7 @@ const postStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: "social-media-app/posts",
-    allowed_formats: ["jpg", "jpeg", "png", "gif", "mp4", "mov"],
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "mp4", "mov"],
     resource_type: "auto",
   },
 });

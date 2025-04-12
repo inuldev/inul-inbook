@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 import {
@@ -217,12 +218,18 @@ const ProfileDetails = ({
                   (post) => post?.mediaType === "image" && post?.mediaUrl
                 )
                 .map((post) => (
-                  <img
+                  <div
                     key={post?._id}
-                    src={post?.mediaUrl}
-                    alt="user_all_photos"
-                    className="w-[200px] h-[150px] object-cover rounded-lg"
-                  />
+                    className="relative w-[200px] h-[150px] rounded-lg overflow-hidden"
+                  >
+                    <Image
+                      src={post?.mediaUrl}
+                      alt="user_all_photos"
+                      fill
+                      sizes="200px"
+                      className="object-cover"
+                    />
+                  </div>
                 ))}
             </div>
           </CardContent>

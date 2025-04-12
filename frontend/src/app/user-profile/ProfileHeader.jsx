@@ -1,12 +1,15 @@
 "use client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { AnimatePresence } from "framer-motion";
-import { Camera, PenLine, Save, Upload, X } from "lucide-react";
+
+import Image from "next/image";
+import { useForm } from "react-hook-form";
 import React, { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Camera, PenLine, Save, Upload, X } from "lucide-react";
+
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -14,12 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+import userStore from "@/store/userStore";
 import {
   updateUserCoverPhoto,
   updateUserProfile,
 } from "@/service/user.service";
-import userStore from "@/store/userStore";
-import { useForm } from "react-hook-form";
 
 const ProfileHeader = ({
   id,
@@ -115,11 +118,16 @@ const ProfileHeader = ({
   return (
     <div className="relative">
       <div className="relative h-64 md:h-80 bg-gray-300 overflow-hidden ">
-        <img
-          src={profileData?.coverPhoto}
-          alt="cover"
-          className="w-full h-full object-cover"
-        />
+        <div className="relative w-full h-full">
+          <Image
+            src={profileData?.coverPhoto}
+            alt="cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 1200px"
+            className="object-cover"
+            priority
+          />
+        </div>
         {isOwner && (
           <Button
             className="absolute bottom-4 right-4 flex items-center"

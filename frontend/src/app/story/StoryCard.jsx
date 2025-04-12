@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import { Play, X } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,28 +57,36 @@ const StoryCard = ({ story }) => {
         <CardContent className="p-0 h-full">
           <div className="absolute inset-0 bg-black bg-opacity-20 z-10"></div>
           {story?.mediaType === "image" ? (
-            <img
-              src={story?.mediaUrl}
-              alt={story?.user?.username || "Story"}
-              className="w-full h-full object-cover"
-            />
+            <div className="relative w-full h-full">
+              <Image
+                src={story?.mediaUrl}
+                alt={story?.user?.username || "Story"}
+                fill
+                sizes="110px"
+                className="object-cover"
+              />
+            </div>
           ) : (
             <div className="relative w-full h-full">
               <div className="w-full h-full bg-gradient-to-b from-blue-900 to-purple-900">
                 {/* Video thumbnail with fallback */}
-                <img
-                  src={
-                    story?.mediaUrl.replace(/\.(mp4|mov)$/i, ".jpg") ||
-                    story?.mediaUrl
-                  }
-                  alt={story?.user?.username || "Story"}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src =
-                      "https://placehold.co/110x200/333/white?text=Video";
-                  }}
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={
+                      story?.mediaUrl.replace(/\.(mp4|mov)$/i, ".jpg") ||
+                      story?.mediaUrl
+                    }
+                    alt={story?.user?.username || "Story"}
+                    fill
+                    sizes="110px"
+                    className="object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "https://placehold.co/110x200/333/white?text=Video";
+                    }}
+                  />
+                </div>
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="bg-black bg-opacity-50 rounded-full p-2">
