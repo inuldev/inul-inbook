@@ -181,8 +181,7 @@ export const sharePost = async (
       setIsShareDialogOpen(false);
     }
 
-    // Show success message
-    showSuccessToast(`Post shared on ${platform}`);
+    // Success message is now handled by the caller to avoid duplicate messages
   } catch (error) {
     console.error("Error sharing post:", error);
 
@@ -200,7 +199,13 @@ export const sharePost = async (
  * @returns {string} - The shareable link
  */
 export const generateSharedLink = (postId) => {
+  // Get the base URL from environment variable or current origin
   const baseUrl =
     process.env.NEXT_PUBLIC_FRONTEND_URL || window.location.origin;
-  return `${baseUrl}/posts/${postId}`;
+
+  // Create a full URL to the post
+  const postUrl = `${baseUrl}/posts/${postId}`;
+
+  console.log(`Generated shared link for post ${postId}: ${postUrl}`);
+  return postUrl;
 };

@@ -1,49 +1,65 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ChevronLeft, Share2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import MediaCard from "@/components/shared/MediaCard";
 import Loader from "@/components/ui/loader";
-import { showErrorToast } from "@/lib/toastUtils";
-import config from "@/lib/config";
+import { Button } from "@/components/ui/button";
+import BaseCard from "@/components/shared/BaseCard";
+import MediaCard from "@/components/shared/MediaCard";
+import { Card, CardContent } from "@/components/ui/card";
+import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
+import { generateSharedLink } from "@/lib/postInteractionHelpers";
+
+import usePostStore from "@/store/postStore";
 
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { id } = params;
+  const { fetchPost } = usePostStore();
 
   const [post, setPost] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Function to handle sharing the current post
+  const handleShareCurrentPost = async () => {
+    if (!post) return;
+
+    try {
+      // Copy the post URL to clipboard
+      const postUrl = generateSharedLink(post._id);
+      await navigator.clipboard.writeText(postUrl);
+
+      // Update share count in backend
+      await usePostStore.getState().sharePost(post._id, "copy");
+
+      showSuccessToast("Link copied to clipboard!");
+    } catch (error) {
+      console.error("Error sharing post:", error);
+      showErrorToast("Failed to share post");
+    }
+  };
+
   useEffect(() => {
-    const fetchPost = async () => {
+    const loadPost = async () => {
       if (!id) return;
 
       setIsLoading(true);
       setError(null);
 
       try {
-        const response = await fetch(`${config.backendUrl}/api/posts/${id}`, {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: config.apiTimeouts.medium,
-        });
+        // Use the fetchPost function from postStore
+        // This ensures consistent post data format and handling
+        const postData = await fetchPost(id);
 
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.message || "Failed to load post");
+        if (!postData) {
+          throw new Error("Post not found");
         }
 
-        setPost(data.data);
+        setPost(postData);
       } catch (error) {
         console.error("Error loading post:", error);
         setError(error.message || "Failed to load post");
@@ -53,8 +69,8 @@ export default function PostDetailPage() {
       }
     };
 
-    fetchPost();
-  }, [id]);
+    loadPost();
+  }, [id, fetchPost]);
 
   const handleGoBack = () => {
     router.back();
@@ -62,10 +78,19 @@ export default function PostDetailPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Button variant="ghost" className="mb-6" onClick={handleGoBack}>
-        <ChevronLeft className="mr-2 h-4 w-4" />
-        Back
-      </Button>
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="ghost" onClick={handleGoBack}>
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+
+        {post && (
+          <Button variant="outline" onClick={handleShareCurrentPost}>
+            <Share2 className="mr-2 h-4 w-4" />
+            Share
+          </Button>
+        )}
+      </div>
 
       <h1 className="text-2xl font-bold mb-6 dark:text-white">Post Details</h1>
 
@@ -83,7 +108,11 @@ export default function PostDetailPage() {
           </CardContent>
         </Card>
       ) : post ? (
-        <MediaCard post={post} />
+        post.mediaType === "video" ? (
+          <MediaCard post={post} />
+        ) : (
+          <BaseCard post={post} />
+        )
       ) : (
         <Card>
           <CardContent className="p-6 text-center py-10">

@@ -259,8 +259,20 @@ const BaseCard = ({
       return;
     }
 
-    // Use the standardized helper function
-    await sharePost(post._id, platform, setShareCount, setIsShareDialogOpen);
+    try {
+      // Use the standardized helper function
+      await sharePost(post._id, platform, setShareCount, setIsShareDialogOpen);
+
+      // Show appropriate success message based on platform
+      if (platform === "copy") {
+        showSuccessToast("Link copied to clipboard!");
+      } else {
+        showSuccessToast(`Post shared on ${platform}`);
+      }
+    } catch (error) {
+      console.error(`Error sharing post on ${platform}:`, error);
+      showErrorToast(`Failed to share post on ${platform}`);
+    }
   };
 
   /**
@@ -505,31 +517,85 @@ const BaseCard = ({
                 </DialogHeader>
                 <div className="flex flex-col gap-4 mt-4">
                   <Button
-                    onClick={() => handleShare("facebook")}
+                    onClick={() => {
+                      // Generate post URL
+                      const postUrl = generateSharedLink(post._id);
+                      // Open Facebook share dialog
+                      window.open(
+                        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                          postUrl
+                        )}`,
+                        "_blank",
+                        "width=600,height=400"
+                      );
+                      // Update share count in backend
+                      handleShare("facebook");
+                    }}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     Share on Facebook
                   </Button>
                   <Button
-                    onClick={() => handleShare("twitter")}
+                    onClick={() => {
+                      // Generate post URL
+                      const postUrl = generateSharedLink(post._id);
+                      const text = post.text
+                        ? post.text.substring(0, 100)
+                        : "Check out this post";
+                      // Open Twitter share dialog
+                      window.open(
+                        `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+                          postUrl
+                        )}&text=${encodeURIComponent(text)}`,
+                        "_blank",
+                        "width=600,height=400"
+                      );
+                      // Update share count in backend
+                      handleShare("twitter");
+                    }}
                     className="bg-sky-500 hover:bg-sky-600"
                   >
                     Share on Twitter
                   </Button>
                   <Button
-                    onClick={() => handleShare("linkedin")}
+                    onClick={() => {
+                      // Generate post URL
+                      const postUrl = generateSharedLink(post._id);
+                      const title = post.text
+                        ? post.text.substring(0, 100)
+                        : "Check out this post";
+                      // Open LinkedIn share dialog
+                      window.open(
+                        `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+                          postUrl
+                        )}`,
+                        "_blank",
+                        "width=600,height=400"
+                      );
+                      // Update share count in backend
+                      handleShare("linkedin");
+                    }}
                     className="bg-blue-800 hover:bg-blue-900"
                   >
                     Share on LinkedIn
                   </Button>
                   <Button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        generateSharedLink(post._id)
-                      );
-                      showSuccessToast("Link copied to clipboard!");
-                      handleShare("copy");
-                      setIsShareDialogOpen(false);
+                    onClick={async () => {
+                      try {
+                        // Copy link to clipboard
+                        await navigator.clipboard.writeText(
+                          generateSharedLink(post._id)
+                        );
+
+                        // Call handleShare to update share count in backend
+                        await handleShare("copy");
+
+                        // Close dialog
+                        setIsShareDialogOpen(false);
+                      } catch (error) {
+                        console.error("Error copying link:", error);
+                        showErrorToast("Failed to copy link");
+                      }
                     }}
                   >
                     Copy Link
