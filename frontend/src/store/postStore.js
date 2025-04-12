@@ -848,6 +848,56 @@ const usePostStore = create((set, get) => ({
   },
 
   /**
+   * Fetch video posts
+   * @param {number} page - Page number
+   * @param {number} limit - Number of posts per page
+   * @returns {Promise<Array>} - Array of video posts
+   */
+  fetchVideoPosts: async (page = 1, limit = 20) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(
+        `${config.backendUrl}/api/posts?page=${page}&limit=${limit}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: config.apiTimeouts.medium,
+        }
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to fetch video posts");
+      }
+
+      // Process posts to ensure consistent format
+      const currentUser = userStore.getState().user;
+      const allPosts = data.data.map((post) =>
+        get().processPost(post, currentUser)
+      );
+
+      // Filter for video posts only
+      const videoPosts = allPosts.filter((post) => post.mediaType === "video");
+
+      set({
+        posts: videoPosts,
+        pagination: data.pagination,
+        loading: false,
+      });
+
+      return videoPosts;
+    } catch (error) {
+      console.error("Error fetching video posts:", error);
+      set({ error: error.message, loading: false });
+      return [];
+    }
+  },
+
+  /**
    * Clear all posts from the store
    */
   clearPosts: () => {

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import userStore from "@/store/userStore";
+import { showInfoToast } from "@/lib/toastUtils";
 import useSidebarStore from "@/store/sidebarStore";
 import useFriendNotificationStore from "@/store/friendNotificationStore";
 
@@ -75,20 +76,8 @@ const LeftSideBar = () => {
           : "-translate-x-full"
       } ${isSidebarOpen ? "md:hidden" : ""} md:bg-transparent md:shadow-none`}
     >
-      <div className="flex flex-col h-full overflow-y-auto">
+      <div className="flex flex-col h-full overflow-y-auto mt-6">
         <nav className="space-y-4 flex-grow">
-          <div
-            className="flex items-center space-x-2 cursor-pointer"
-            onClick={() => handleNavigation("/")}
-          >
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.profilePicture} />
-              <AvatarFallback className="dark:bg-gray-400">
-                {user?.username?.charAt(0) || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="font-semibold">{user?.username || "User"}</span>
-          </div>
           <Button
             variant="ghost"
             className="full justify-start"
@@ -100,7 +89,7 @@ const LeftSideBar = () => {
           <Button
             variant="ghost"
             className="full justify-start relative"
-            onClick={() => handleNavigation("/friends-list", "friends")}
+            onClick={() => handleNavigation("/friends-list")}
           >
             <Users className="mr-4" />
             Friends List
@@ -113,7 +102,7 @@ const LeftSideBar = () => {
           <Button
             variant="ghost"
             className="full justify-start"
-            onClick={() => handleNavigation("/video-feed", "video")}
+            onClick={() => handleNavigation("/video-feed")}
           >
             <Video className="mr-4" />
             Video Feed
@@ -126,22 +115,39 @@ const LeftSideBar = () => {
             <User className="mr-4" />
             Profile
           </Button>
-          <Button variant="ghost" className="full justify-start">
+          <Button
+            variant="ghost"
+            className="full justify-start"
+            onClick={() =>
+              showInfoToast("Messages feature is currently under development")
+            }
+          >
             <MessageCircle className="mr-4" />
             Messages
           </Button>
-          <Button variant="ghost" className="full justify-start">
+          <Button
+            variant="ghost"
+            className="full justify-start"
+            onClick={() =>
+              showInfoToast(
+                "Notifications feature is currently under development"
+              )
+            }
+          >
             <Bell className="mr-4" />
             Notification
           </Button>
         </nav>
 
         {/* footer section */}
-        <div className="mb-16">
+        <div className="mb-16 mt-4">
           <Separator className="my-4" />
-          <div className="flex items-center space-x-2 mb-4 cursor-pointer">
+          <div
+            className="flex items-center space-x-2 mb-4 cursor-pointer"
+            onClick={() => handleNavigation(`/user-profile/${user?._id}`)}
+          >
             <Avatar className="h-10 w-10">
-              <AvatarImage src={user?.profilePicture} />
+              <AvatarImage src={user?.profilePicture || ""} />
               <AvatarFallback className="dark:bg-gray-400">
                 {user?.username?.charAt(0) || "U"}
               </AvatarFallback>

@@ -222,13 +222,21 @@ const ProfileDetails = ({
                     key={post?._id}
                     className="relative w-[200px] h-[150px] rounded-lg overflow-hidden"
                   >
-                    <Image
-                      src={post?.mediaUrl}
-                      alt="user_all_photos"
-                      fill
-                      sizes="200px"
-                      className="object-cover"
-                    />
+                    {post?.mediaUrl ? (
+                      <Image
+                        src={post.mediaUrl}
+                        alt="user_all_photos"
+                        fill
+                        sizes="200px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          No image
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
             </div>

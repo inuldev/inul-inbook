@@ -100,7 +100,7 @@ const StoryForm = () => {
               <p className="text-sm font-medium text-center">Create Story</p>
               <div className="absolute bottom-4 w-8 h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-800">
                 <Avatar className="h-full w-full">
-                  <AvatarImage src={user?.profilePicture} />
+                  <AvatarImage src={user?.profilePicture || ""} />
                   <AvatarFallback className="dark:bg-gray-600">
                     {user?.username?.charAt(0) || "U"}
                   </AvatarFallback>

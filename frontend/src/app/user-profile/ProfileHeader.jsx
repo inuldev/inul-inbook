@@ -118,16 +118,24 @@ const ProfileHeader = ({
   return (
     <div className="relative">
       <div className="relative h-64 md:h-80 bg-gray-300 overflow-hidden ">
-        <div className="relative w-full h-full">
-          <Image
-            src={profileData?.coverPhoto}
-            alt="cover"
-            fill
-            sizes="(max-width: 768px) 100vw, 1200px"
-            className="object-cover"
-            priority
-          />
-        </div>
+        {profileData?.coverPhoto ? (
+          <div className="relative w-full h-full">
+            <Image
+              src={profileData.coverPhoto}
+              alt="cover"
+              fill
+              sizes="(max-width: 768px) 100vw, 1200px"
+              className="object-cover"
+              priority
+            />
+          </div>
+        ) : (
+          <div className="w-full h-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+            <span className="text-gray-500 dark:text-gray-400">
+              No cover photo
+            </span>
+          </div>
+        )}
         {isOwner && (
           <Button
             className="absolute bottom-4 right-4 flex items-center"
@@ -145,8 +153,8 @@ const ProfileHeader = ({
         <div className="flex flex-col md:flex-row items-center md:items-end md:space-x-5 ">
           <Avatar className="w-32 h-32 border-4 border-white dark:border-gray-700">
             <AvatarImage
-              src={profileData?.profilePicture}
-              alt={profileData?.username}
+              src={profileData?.profilePicture || ""}
+              alt={profileData?.username || "User"}
             />
             <AvatarFallback className="dark:bg-gray-400">
               {profileData?.username

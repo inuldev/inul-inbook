@@ -58,34 +58,48 @@ const StoryCard = ({ story }) => {
           <div className="absolute inset-0 bg-black bg-opacity-20 z-10"></div>
           {story?.mediaType === "image" ? (
             <div className="relative w-full h-full">
-              <Image
-                src={story?.mediaUrl}
-                alt={story?.user?.username || "Story"}
-                fill
-                sizes="110px"
-                className="object-cover"
-              />
+              {story?.mediaUrl ? (
+                <Image
+                  src={story.mediaUrl}
+                  alt={story?.user?.username || "Story"}
+                  fill
+                  sizes="110px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    No image
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="relative w-full h-full">
               <div className="w-full h-full bg-gradient-to-b from-blue-900 to-purple-900">
                 {/* Video thumbnail with fallback */}
                 <div className="relative w-full h-full">
-                  <Image
-                    src={
-                      story?.mediaUrl.replace(/\.(mp4|mov)$/i, ".jpg") ||
-                      story?.mediaUrl
-                    }
-                    alt={story?.user?.username || "Story"}
-                    fill
-                    sizes="110px"
-                    className="object-cover"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src =
-                        "https://placehold.co/110x200/333/white?text=Video";
-                    }}
-                  />
+                  {story?.mediaUrl ? (
+                    <Image
+                      src={
+                        story.mediaUrl.replace(/\.(mp4|mov)$/i, ".jpg") ||
+                        story.mediaUrl
+                      }
+                      alt={story?.user?.username || "Story"}
+                      fill
+                      sizes="110px"
+                      className="object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src =
+                          "https://placehold.co/110x200/333/white?text=Video";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-600 flex items-center justify-center">
+                      <span className="text-xs text-gray-300">No video</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -97,7 +111,7 @@ const StoryCard = ({ story }) => {
           )}
           <div className="absolute top-2 left-2 ring-2 ring-blue-500 rounded-full z-20">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={story?.user?.profilePicture} />
+              <AvatarImage src={story?.user?.profilePicture || ""} />
               <AvatarFallback className="dark:bg-gray-600">
                 {story?.user?.username?.charAt(0) || "U"}
               </AvatarFallback>

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import userStore from "@/store/userStore";
+import { showInfoToast } from "@/lib/toastUtils";
 import useSidebarStore from "@/store/sidebarStore";
 import useFriendNotificationStore from "@/store/friendNotificationStore";
 import { searchUsers } from "@/service/user.service";
@@ -168,7 +169,7 @@ const Header = () => {
                         >
                           <div className="flex items-center gap-2">
                             <Avatar className="h-8 w-8">
-                              <AvatarImage src={result.profilePicture} />
+                              <AvatarImage src={result.profilePicture || ""} />
                               <AvatarFallback className="dark:bg-gray-600">
                                 {result.username?.charAt(0) || "U"}
                               </AvatarFallback>
@@ -235,6 +236,11 @@ const Header = () => {
             variant="ghost"
             size="icon"
             className="hidden md:block text-gray-600 cursor-pointer pl-1"
+            onClick={() =>
+              showInfoToast(
+                "Notifications feature is currently under development"
+              )
+            }
           >
             <Bell />
           </Button>
@@ -242,6 +248,9 @@ const Header = () => {
             variant="ghost"
             size="icon"
             className="hidden md:block text-gray-600 cursor-pointer pl-1"
+            onClick={() =>
+              showInfoToast("Messages feature is currently under development")
+            }
           >
             <MessageCircle />
           </Button>
@@ -249,7 +258,7 @@ const Header = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                 <Avatar className="h-8 w-8 mr-2">
-                  <AvatarImage src={user?.profilePicture} />
+                  <AvatarImage src={user?.profilePicture || ""} />
                   <AvatarFallback className="dark:bg-gray-400">
                     {user?.username?.charAt(0) || "U"}
                   </AvatarFallback>
@@ -261,7 +270,7 @@ const Header = () => {
                 <div className="flex flex-col space-y-1">
                   <div className="flex items-center">
                     <Avatar className="h-8 w-8 mr-2">
-                      <AvatarImage src={user?.profilePicture} />
+                      <AvatarImage src={user?.profilePicture || ""} />
                       <AvatarFallback className="dark:bg-gray-400">
                         {user?.username?.charAt(0) || "U"}
                       </AvatarFallback>
@@ -285,7 +294,14 @@ const Header = () => {
                 <Users />
                 <span className="ml-2">Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() =>
+                  showInfoToast(
+                    "Messages feature is currently under development"
+                  )
+                }
+              >
                 <MessageCircle />
                 <span className="ml-2">Messages</span>
               </DropdownMenuItem>
