@@ -1,0 +1,28 @@
+{
+  "name": "social-media-app",
+  "version": "1.0.0",
+  "description": "A social media application with features like Facebook",
+  "scripts": {
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "build": "concurrently \"cd backend && npm run build\" \"cd frontend && npm run build\"",
+    "start": "concurrently \"cd backend && npm start\" \"cd frontend && npm start\"",
+    "deploy:prepare": "node deploy-vercel.js",
+    "deploy:frontend": "cd frontend && vercel",
+    "deploy:backend": "cd backend && vercel",
+    "deploy": "npm run deploy:prepare && npm run deploy:frontend && npm run deploy:backend",
+    "switch:dev": "cd backend && npm run switch:dev && cd ../frontend && npm run switch:dev",
+    "switch:prod": "cd backend && npm run switch:prod && cd ../frontend && npm run switch:prod"
+  },
+  "keywords": [
+    "social-media",
+    "nextjs",
+    "mongodb",
+    "express",
+    "tailwindcss"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
