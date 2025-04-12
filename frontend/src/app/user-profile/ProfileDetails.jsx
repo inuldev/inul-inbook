@@ -22,6 +22,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
 import EditBio from "./profileContent/EditBio";
 import PostsContent from "./profileContent/PostsContent";
 import MutualFriends from "./profileContent/MutualFriends";
+import UserFriends from "./profileContent/UserFriends";
 
 const ProfileDetails = ({
   activeTab,
@@ -199,7 +200,7 @@ const ProfileDetails = ({
         </Card>
       </motion.div>
     ),
-    friends: <MutualFriends id={id} isOwner={isOwner} />,
+    friends: <UserFriends id={id} isOwner={isOwner} />,
     photos: (
       <motion.div
         initial={{ opacity: 0, y: 20 }}

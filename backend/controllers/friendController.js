@@ -37,11 +37,13 @@ const getFriendSuggestions = async (req, res) => {
     }, []);
 
     // Get all users except current user, those in following/followers lists, and those with pending requests
+    // Note: We only exclude users that are in BOTH following AND followers lists to ensure unfollowed users appear
     const suggestions = await User.find({
       $and: [
         { _id: { $ne: currentUser._id } },
+        // Only exclude users that the current user is following
         { _id: { $nin: currentUser.following } },
-        { _id: { $nin: currentUser.followers } },
+        // We don't exclude followers here to ensure unfollowed users appear in suggestions
         { _id: { $nin: pendingUserIds } },
       ],
     }).select("username email profilePicture");
@@ -109,21 +111,33 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
-    // Check if a request already exists
+    // Check if any request exists (regardless of status)
     const existingRequest = await FriendRequest.findOne({
       sender: req.user.id,
       recipient: id,
-      status: "pending",
     });
 
     if (existingRequest) {
-      return res.status(400).json({
-        success: false,
-        message: "Friend request already sent",
-      });
+      // If there's an existing request but it's not pending, update it
+      if (existingRequest.status !== "pending") {
+        existingRequest.status = "pending";
+        await existingRequest.save();
+
+        return res.status(200).json({
+          success: true,
+          data: existingRequest,
+          message: "Friend request renewed",
+        });
+      } else {
+        // If it's already pending, return an error
+        return res.status(400).json({
+          success: false,
+          message: "Friend request already sent",
+        });
+      }
     }
 
-    // Create a new friend request
+    // If no existing request, create a new one
     const friendRequest = await FriendRequest.create({
       sender: req.user.id,
       recipient: id,
@@ -173,21 +187,41 @@ const acceptFriendRequest = async (req, res) => {
     friendRequest.status = "accepted";
     await friendRequest.save();
 
-    // Add each user to the other's following/followers lists
+    // Add each user to the other's following/followers lists to create a bidirectional relationship
     const sender = await User.findById(friendRequest.sender);
     const recipient = await User.findById(friendRequest.recipient);
 
+    // Add recipient to sender's following list
     if (!sender.following.includes(recipient._id)) {
       sender.following.push(recipient._id);
       sender.followingCount += 1;
-      await sender.save();
     }
 
+    // Add sender to recipient's followers list
     if (!recipient.followers.includes(sender._id)) {
       recipient.followers.push(sender._id);
       recipient.followerCount += 1;
-      await recipient.save();
     }
+
+    // Add sender to recipient's following list (for bidirectional friendship)
+    if (!recipient.following.includes(sender._id)) {
+      recipient.following.push(sender._id);
+      recipient.followingCount += 1;
+    }
+
+    // Add recipient to sender's followers list (for bidirectional friendship)
+    if (!sender.followers.includes(recipient._id)) {
+      sender.followers.push(recipient._id);
+      sender.followerCount += 1;
+    }
+
+    // Save both users
+    await sender.save();
+    await recipient.save();
+
+    console.log(
+      `Created bidirectional friendship between ${sender.username} and ${recipient.username}`
+    );
 
     res.status(200).json({
       success: true,

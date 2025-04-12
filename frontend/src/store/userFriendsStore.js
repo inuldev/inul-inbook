@@ -35,14 +35,14 @@ export const userFriendStore = create((set, get) => ({
         mutualFriends: data.data || [],
         loading: false,
       });
-      
+
       return data.data;
     } catch (error) {
       console.error("Error fetching mutual friends:", error);
-      set({ 
-        error: error.message, 
+      set({
+        error: error.message,
         loading: false,
-        mutualFriends: [] 
+        mutualFriends: [],
       });
       return [];
     }
@@ -74,14 +74,14 @@ export const userFriendStore = create((set, get) => ({
         followers: data.data || [],
         loading: false,
       });
-      
+
       return data.data;
     } catch (error) {
       console.error("Error fetching followers:", error);
-      set({ 
-        error: error.message, 
+      set({
+        error: error.message,
         loading: false,
-        followers: [] 
+        followers: [],
       });
       return [];
     }
@@ -109,18 +109,23 @@ export const userFriendStore = create((set, get) => ({
         throw new Error(data.message || "Failed to fetch following");
       }
 
+      // Log the response for debugging
+      console.log(
+        `Fetched ${data.data?.length || 0} following users for user ${userId}`
+      );
+
       set({
         following: data.data || [],
         loading: false,
       });
-      
+
       return data.data;
     } catch (error) {
       console.error("Error fetching following:", error);
-      set({ 
-        error: error.message, 
+      set({
+        error: error.message,
         loading: false,
-        following: [] 
+        following: [],
       });
       return [];
     }
@@ -130,12 +135,12 @@ export const userFriendStore = create((set, get) => ({
   FollowUser: async (userId) => {
     try {
       const result = await followUser(userId);
-      
+
       // Update the mutual friends list
       set((state) => ({
         mutualFriends: [...state.mutualFriends, result],
       }));
-      
+
       return result;
     } catch (error) {
       console.error("Error following user:", error);
@@ -147,14 +152,25 @@ export const userFriendStore = create((set, get) => ({
   UnfollowUser: async (userId) => {
     try {
       await unfollowUser(userId);
-      
+
       // Remove the user from mutual friends list
       set((state) => ({
         mutualFriends: state.mutualFriends.filter(
           (friend) => friend._id !== userId
         ),
       }));
-      
+
+      // Refresh friend suggestions to make sure the unfollowed user appears there
+      try {
+        const { getFriendSuggestions } = await import(
+          "@/service/friends.service"
+        );
+        await getFriendSuggestions();
+      } catch (refreshError) {
+        console.error("Error refreshing friend suggestions:", refreshError);
+        // Continue even if refresh fails
+      }
+
       return true;
     } catch (error) {
       console.error("Error unfollowing user:", error);

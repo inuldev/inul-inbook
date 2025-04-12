@@ -18,7 +18,7 @@ import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 const MutualFriends = ({ id, isOwner }) => {
   const router = useRouter();
-  const { fetchMutualFriends, mutualFriends, unfollowUser } = userFriendStore();
+  const { fetchMutualFriends, mutualFriends, UnfollowUser } = userFriendStore();
   useEffect(() => {
     if (id) {
       fetchMutualFriends(id);
@@ -26,8 +26,15 @@ const MutualFriends = ({ id, isOwner }) => {
   }, [id, fetchMutualFriends]);
 
   const handleUnfollow = async (userId) => {
-    await unfollowUser(userId);
-    showSuccessToast("you have unfollow successfully");
+    try {
+      await UnfollowUser(userId);
+      showSuccessToast("You have unfollowed successfully");
+      // Refresh the mutual friends list
+      await fetchMutualFriends(id);
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      showErrorToast("Failed to unfollow user");
+    }
   };
 
   const handleUserClick = (userId) => {
@@ -48,9 +55,18 @@ const MutualFriends = ({ id, isOwner }) => {
     >
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-xl font-semibold mb-4 dark:text-gray-300">
-            Mutual Friends
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold dark:text-gray-300">
+              Mutual Friends
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/friends-list")}
+            >
+              View Friend Suggestions
+            </Button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mutualFriends.map((friend) => (
               <div
@@ -93,10 +109,7 @@ const MutualFriends = ({ id, isOwner }) => {
                   {isOwner && (
                     <DropdownMenuContent
                       align="end"
-                      onClick={async () => {
-                        await handleUnfollow(friend._id);
-                        await fetchMutualFriends(id);
-                      }}
+                      onClick={() => handleUnfollow(friend._id)}
                     >
                       <DropdownMenuItem>
                         <UserX className="h-4 w-4 mr-2" /> Unfollow

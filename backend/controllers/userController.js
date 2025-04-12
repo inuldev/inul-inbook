@@ -292,21 +292,76 @@ const unfollowUser = async (req, res) => {
       });
     }
 
-    // Remove from following
+    // For bidirectional friendship, we need to remove both directions
+
+    // 1. Remove the target user from current user's following list
     currentUser.following = currentUser.following.filter(
       (id) => id.toString() !== req.params.id
     );
-    currentUser.followingCount -= 1;
+    currentUser.followingCount = Math.max(0, currentUser.followingCount - 1);
 
-    // Remove from followers
+    // 2. Remove the target user from current user's followers list
+    currentUser.followers = currentUser.followers.filter(
+      (id) => id.toString() !== req.params.id
+    );
+    currentUser.followerCount = Math.max(0, currentUser.followerCount - 1);
+
+    // 3. Remove the current user from target user's following list
+    userToUnfollow.following = userToUnfollow.following.filter(
+      (id) => id.toString() !== req.user.id
+    );
+    userToUnfollow.followingCount = Math.max(
+      0,
+      userToUnfollow.followingCount - 1
+    );
+
+    // 4. Remove the current user from target user's followers list
     userToUnfollow.followers = userToUnfollow.followers.filter(
       (id) => id.toString() !== req.user.id
     );
-    userToUnfollow.followerCount -= 1;
+    userToUnfollow.followerCount = Math.max(
+      0,
+      userToUnfollow.followerCount - 1
+    );
+
+    console.log(
+      `Removed bidirectional friendship between ${currentUser.username} and ${userToUnfollow.username}`
+    );
 
     // Save both users
     await currentUser.save();
     await userToUnfollow.save();
+
+    // Find and update any existing friend requests between these users
+    // This will ensure that if they try to follow each other again, they won't get duplicate key errors
+    try {
+      const FriendRequest = require("../model/FriendRequest");
+
+      // Find any friend requests between these users (in either direction)
+      const existingRequests = await FriendRequest.find({
+        $or: [
+          { sender: currentUser._id, recipient: userToUnfollow._id },
+          { sender: userToUnfollow._id, recipient: currentUser._id },
+        ],
+      });
+
+      // If there are any requests, mark them as 'declined' instead of deleting
+      // This preserves the record but allows new requests to be sent
+      for (const request of existingRequests) {
+        request.status = "declined";
+        await request.save();
+      }
+
+      console.log(
+        `Updated ${existingRequests.length} friend requests after unfollow`
+      );
+    } catch (friendRequestError) {
+      console.error(
+        "Error updating friend requests after unfollow:",
+        friendRequestError
+      );
+      // Continue even if this fails, as the main unfollow operation succeeded
+    }
 
     res.status(200).json({
       success: true,
@@ -356,7 +411,10 @@ const getUserFollowers = async (req, res) => {
 const getUserFollowing = async (req, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .populate("following", "username profilePicture")
+      .populate(
+        "following",
+        "username email profilePicture followerCount followingCount"
+      )
       .select("following");
 
     if (!user) {
@@ -366,11 +424,16 @@ const getUserFollowing = async (req, res) => {
       });
     }
 
+    console.log(
+      `Returning ${user.following.length} following users for user ${req.params.id}`
+    );
+
     res.status(200).json({
       success: true,
       data: user.following,
     });
   } catch (error) {
+    console.error("Error getting user following:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -440,14 +503,34 @@ const getMutualFriends = async (req, res) => {
       });
     }
 
-    // Find mutual friends (users that both the current user and target user follow)
+    // Find true mutual friends (bidirectional relationship)
+    // These are users who are both in the current user's following list AND followers list
+    // This ensures we only show users with a complete bidirectional friendship
+
+    // Get users that the current user follows
+    const currentUserFollowing = currentUser.following.map((id) =>
+      id.toString()
+    );
+
+    // Get users that follow the current user
+    const currentUserFollowers = currentUser.followers.map((id) =>
+      id.toString()
+    );
+
+    // For true mutual friendship, find users that are both in following AND followers
+    // This means there's a bidirectional relationship
+    const mutualFriendIds = currentUserFollowing.filter((id) =>
+      currentUserFollowers.includes(id)
+    );
+
+    console.log(
+      `Found ${mutualFriendIds.length} mutual friends for user ${currentUser.username}`
+    );
+
+    // Get the user details for these mutual friends
     const mutualFriends = await User.find({
-      _id: {
-        $in: currentUser.following.filter((id) =>
-          targetUser.following.includes(id)
-        ),
-      },
-    }).select("username email profilePicture followerCount");
+      _id: { $in: mutualFriendIds },
+    }).select("username email profilePicture followerCount followingCount");
 
     res.status(200).json({
       success: true,
