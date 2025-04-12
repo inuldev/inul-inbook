@@ -64,7 +64,9 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       }
 
       // Jika tidak terautentikasi dengan utility functions, coba metode lain
-      console.log("Not authenticated with utility functions, trying other methods");
+      console.log(
+        "Not authenticated with utility functions, trying other methods"
+      );
 
       // Coba inisialisasi dari storage (localStorage, sessionStorage, cookies)
       const storageAuthResult = initAuthFromStorage();
@@ -83,7 +85,10 @@ function AuthProviderCore({ searchParams, pathname, children }) {
         // Coba ambil token dari storage
         const token = getToken();
         if (token) {
-          console.log("Token found in storage:", token.substring(0, 10) + "...");
+          console.log(
+            "Token found in storage:",
+            token.substring(0, 10) + "..."
+          );
 
           // Coba ambil user data dari storage
           const userData = getUserData();
@@ -107,10 +112,15 @@ function AuthProviderCore({ searchParams, pathname, children }) {
               setAuthChecked(true);
               return;
             } catch (userDataError) {
-              console.error("Error parsing user data from storage:", userDataError);
+              console.error(
+                "Error parsing user data from storage:",
+                userDataError
+              );
 
               // Jika gagal parse user data, coba ambil dari API
-              console.log("Error with stored user data, trying to fetch from API");
+              console.log(
+                "Error with stored user data, trying to fetch from API"
+              );
               try {
                 await getCurrentUser();
                 console.log(
@@ -184,7 +194,9 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       }
 
       // Jika sampai di sini, berarti tidak ada autentikasi yang valid
-      console.log("No valid authentication found, clearing any partial auth data");
+      console.log(
+        "No valid authentication found, clearing any partial auth data"
+      );
 
       // Reset state
       userStore.setState({
@@ -195,7 +207,15 @@ function AuthProviderCore({ searchParams, pathname, children }) {
       });
 
       try {
-        await getCurrentUser();
+        const result = await getCurrentUser();
+        // If getCurrentUser returns null (no token found), don't treat it as an error
+        if (result === null) {
+          console.log(
+            "No authentication token found, continuing as unauthenticated user"
+          );
+          setAuthChecked(true);
+          return;
+        }
       } catch (error) {
         console.error("Auth check failed:", error);
         // Hapus token yang tidak valid dari semua penyimpanan

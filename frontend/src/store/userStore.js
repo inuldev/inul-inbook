@@ -335,7 +335,22 @@ const userStore = create((set) => ({
         !devCookieToken
       ) {
         console.log("No authentication tokens found in any source");
-        throw new Error("No authentication token found");
+
+        // Instead of throwing an error, just set the state to unauthenticated
+        set({
+          user: null,
+          isAuthenticated: false,
+          loading: false,
+          error: "No authentication token found",
+        });
+
+        // Log the issue but don't redirect to login
+        console.log(
+          "No authentication token found, continuing as unauthenticated user"
+        );
+
+        // Return early to prevent the API call
+        return null;
       }
 
       // Add a timestamp to prevent caching

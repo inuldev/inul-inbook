@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import LoginErrorHandler from "./LoginErrorHandler";
 
 import userStore from "@/store/userStore";
 
@@ -268,6 +269,8 @@ export default function LoginPage() {
             </div>
           </CardHeader>
           <CardContent>
+            <LoginErrorHandler />
+
             {(error || formError) && (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />

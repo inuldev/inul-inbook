@@ -555,6 +555,45 @@ export function redirectAfterLogin(targetUrl = "/") {
 }
 
 /**
+ * Menangani error autentikasi dan menyimpannya untuk ditampilkan di halaman login
+ * @param {Error} error - Error yang terjadi
+ * @param {string} context - Konteks di mana error terjadi
+ */
+export function handleAuthError(error, context = "unknown") {
+  console.error(`Auth error in ${context}:`, error);
+
+  try {
+    // Simpan error di localStorage untuk ditampilkan di halaman login
+    if (isLocalStorageAvailable()) {
+      const errorData = {
+        message: error?.message || "Authentication error occurred",
+        context,
+        timestamp: new Date().getTime(),
+        stack: error?.stack,
+      };
+
+      localStorage.setItem("auth_error", JSON.stringify(errorData));
+    }
+
+    // Redirect ke halaman login dengan parameter error
+    const loginUrl = new URL("/user-login", window.location.origin);
+    loginUrl.searchParams.set("error", "auth_failed");
+    loginUrl.searchParams.set(
+      "message",
+      error?.message || "Authentication error occurred"
+    );
+    loginUrl.searchParams.set("context", context);
+
+    // Redirect ke halaman login
+    window.location.href = loginUrl.toString();
+  } catch (handlingError) {
+    console.error("Error handling auth error:", handlingError);
+    // Fallback redirect
+    window.location.href = "/user-login?error=auth_failed";
+  }
+}
+
+/**
  * Mendiagnosa masalah penyimpanan browser
  * @returns {Object} Hasil diagnosa
  */

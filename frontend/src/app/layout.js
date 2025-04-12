@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import AuthProvider from "./components/AuthProvider";
 import ConditionalHeader from "./components/ConditionalHeader";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import { DebugButton } from "@/components/DebugButton";
 
@@ -60,11 +61,13 @@ export default function RootLayout({ children }) {
           }}
         />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>
-            <ConditionalHeader />
-            {children}
-            <DebugButton />
-          </AuthProvider>
+          <ErrorBoundary>
+            <AuthProvider>
+              <ConditionalHeader />
+              {children}
+              <DebugButton />
+            </AuthProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>
