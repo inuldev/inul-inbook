@@ -64,6 +64,16 @@ export const togglePostLike = async (
       setLikeCount(result.likeCount);
     }
 
+    // Fetch the post again to ensure we have the latest data
+    try {
+      await postStore.fetchPost(postId, true);
+    } catch (fetchError) {
+      console.warn(
+        `Error fetching post after like toggle: ${fetchError.message}`
+      );
+      // Continue even if this fails, as we've already updated the UI
+    }
+
     // Show success message
     if (result.isLiked) {
       showSuccessToast("Post liked");
@@ -87,8 +97,8 @@ export const togglePostLike = async (
  * @param {string} commentText - The comment text
  * @param {Function} setCommentText - Function to update comment text state
  * @param {Function} setCommentCount - Function to update comment count state
- * @param {Function} setIsSubmitting - Function to update submitting state
  * @param {Function} onCommentAdded - Optional callback when comment is added
+ * @param {Function} onCommentSaved - Optional callback when comment is saved to server
  * @returns {Promise<void>}
  */
 export const addPostComment = async (
@@ -96,8 +106,8 @@ export const addPostComment = async (
   commentText,
   setCommentText,
   setCommentCount,
-  setIsSubmitting,
-  onCommentAdded = null
+  onCommentAdded = null,
+  onCommentSaved = null
 ) => {
   try {
     // Get current user
@@ -112,38 +122,63 @@ export const addPostComment = async (
       return;
     }
 
-    // Set submitting state
-    if (setIsSubmitting) setIsSubmitting(true);
-
     // Store comment text and clear input immediately for better UX
     const tempCommentText = commentText.trim();
     setCommentText("");
 
-    // Call the store method
-    const postStore = usePostStore.getState();
-    const newComment = await postStore.addComment(postId, tempCommentText);
-
-    // Update comment count
+    // Update comment count optimistically
     setCommentCount((prev) => prev + 1);
 
-    // Call the callback if provided
+    // Only create a temporary comment if onCommentAdded is provided and we need to show it
+    // This prevents duplicate comments when the component already adds a temp comment
     if (onCommentAdded) {
-      onCommentAdded(newComment);
+      const tempComment = {
+        _id: `temp-${Date.now()}`,
+        text: tempCommentText,
+        user: user,
+        createdAt: new Date().toISOString(),
+        likes: [],
+        likeCount: 0,
+        replies: [],
+        replyCount: 0,
+        isTemp: true,
+      };
+
+      // Call the callback with the temporary comment
+      onCommentAdded(tempComment);
     }
 
-    // Show success message
-    showSuccessToast("Comment added");
-  } catch (error) {
-    console.error("Error adding comment:", error);
+    // Call the store method in the background
+    const postStore = usePostStore.getState();
+    postStore
+      .addComment(postId, tempCommentText)
+      .then((newComment) => {
+        // Success - no need to do anything as the post will be refreshed
+        console.log("Comment added successfully:", newComment._id);
 
+        // Call the callback with the new comment if provided
+        if (onCommentSaved) {
+          onCommentSaved(newComment);
+        }
+      })
+      .catch((error) => {
+        console.error("Error adding comment:", error);
+        // Revert comment count on error
+        setCommentCount((prev) => Math.max(0, prev - 1));
+        // Show error message
+        showErrorToast(error.message || "Failed to add comment");
+        // Restore comment text on error
+        setCommentText(commentText);
+      });
+
+    // Don't wait for the API call to complete
+    // This makes the UI more responsive
+  } catch (error) {
+    console.error("Error in comment submission:", error);
     // Show error message
     showErrorToast(error.message || "Failed to add comment");
-
     // Restore comment text on error
     setCommentText(commentText);
-  } finally {
-    // Reset submitting state
-    if (setIsSubmitting) setIsSubmitting(false);
   }
 };
 
@@ -176,12 +211,21 @@ export const sharePost = async (
     const postStore = usePostStore.getState();
     await postStore.sharePost(postId, platform);
 
+    // Fetch the post again to ensure we have the latest data
+    try {
+      await postStore.fetchPost(postId, true);
+    } catch (fetchError) {
+      console.warn(`Error fetching post after share: ${fetchError.message}`);
+      // Continue even if this fails, as we've already updated the UI
+    }
+
     // Close the share dialog if provided
     if (setIsShareDialogOpen) {
       setIsShareDialogOpen(false);
     }
 
-    // Success message is now handled by the caller to avoid duplicate messages
+    // Show success message
+    showSuccessToast(`Post shared on ${platform}`);
   } catch (error) {
     console.error("Error sharing post:", error);
 

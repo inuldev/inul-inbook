@@ -167,6 +167,15 @@ const BaseCard = ({
       // Use the standardized helper function
       // Note: We don't do optimistic update here because the helper function already does it
       await togglePostLike(post._id, isLiked, setIsLiked, setLikeCount);
+
+      // Update the UI with the latest post data
+      const postStore = usePostStore.getState();
+      const updatedPost = postStore.posts.find((p) => p._id === post._id);
+      if (updatedPost) {
+        setLikeCount(updatedPost.likeCount || 0);
+        setCommentCount(updatedPost.commentCount || 0);
+        setShareCount(updatedPost.shareCount || 0);
+      }
     } catch (error) {
       console.error("Error toggling like:", error);
       showErrorToast("Failed to update like status");
@@ -176,37 +185,36 @@ const BaseCard = ({
   /**
    * Handle comment button click
    */
-  const toggleComments = async () => {
+  const toggleComments = () => {
     // If custom handler is provided, use it
     if (customHandlers?.toggleComments) {
       customHandlers.toggleComments();
       return;
     }
 
-    // If comments are not loaded yet, fetch them
-    if (!post.comments || post.comments.length === 0) {
-      try {
-        setIsSubmitting(true);
-
-        // Fetch post with comments
-        const postStore = usePostStore.getState();
-        const processedPost = await postStore.fetchPost(post._id);
-
-        // Update comment count
-        if (processedPost.comments) {
-          const newCommentCount =
-            processedPost.comments.length || processedPost.commentCount || 0;
-          setCommentCount(newCommentCount);
-        }
-      } catch (error) {
-        console.error("Error fetching post comments:", error);
-        showErrorToast("Failed to load comments");
-      } finally {
-        setIsSubmitting(false);
-      }
+    // Always fetch the latest comments when toggling
+    try {
+      // Fetch post with comments in the background
+      const postStore = usePostStore.getState();
+      postStore
+        .fetchPost(post._id, true, true) // Force refresh to get latest comments
+        .then((processedPost) => {
+          // Update comment count
+          if (processedPost.comments) {
+            const newCommentCount =
+              processedPost.comments.length || processedPost.commentCount || 0;
+            setCommentCount(newCommentCount);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching post comments:", error);
+          // Don't show error toast to avoid disrupting user experience
+        });
+    } catch (error) {
+      console.error("Error initiating comment fetch:", error);
     }
 
-    // Toggle comments using the global store
+    // Toggle comments using the global store immediately
     commentStore.toggleComments(post._id);
   };
 
@@ -224,6 +232,13 @@ const BaseCard = ({
     try {
       // Use the standardized helper function
       await sharePost(post._id, platform, setShareCount, setIsShareDialogOpen);
+
+      // Update the UI with the latest post data
+      const postStore = usePostStore.getState();
+      const updatedPost = postStore.posts.find((p) => p._id === post._id);
+      if (updatedPost) {
+        setShareCount(updatedPost.shareCount || 0);
+      }
 
       // Show appropriate success message based on platform
       if (platform === "copy") {
@@ -364,13 +379,21 @@ const BaseCard = ({
             <div className="relative rounded-lg overflow-hidden mb-4 bg-gray-100 dark:bg-gray-800">
               {post.mediaType === "image" ? (
                 <div className="flex items-center justify-center relative w-full h-[500px]">
+                  {/* Placeholder while image loads */}
+                  <div className="absolute inset-0 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-blue-500 border-opacity-50 rounded-full animate-pulse"></div>
+                  </div>
+
                   <Image
-                    src={`${post?.mediaUrl}?_=${Date.now()}`}
+                    src={post?.mediaUrl}
                     alt="post_image"
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-contain"
-                    priority={false}
+                    className="object-contain z-10"
+                    priority={true}
+                    loading="eager"
+                    placeholder="blur"
+                    blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAEDQIHXG8H1QAAAABJRU5ErkJggg=="
                     onError={(e) => {
                       console.error("Image loading error:", e);
                       // Fallback to original URL without cache busting

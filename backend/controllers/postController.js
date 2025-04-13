@@ -189,6 +189,12 @@ const getFeedPosts = async (req, res) => {
 // @access  Public
 const getPost = async (req, res) => {
   try {
+    // Check if comments should be included
+    const includeComments = req.query.includeComments === "true";
+    console.log(
+      `Getting post ${req.params.id} with includeComments=${includeComments}`
+    );
+
     // First, find the post
     const post = await Post.findById(req.params.id).populate({
       path: "user",
@@ -202,7 +208,19 @@ const getPost = async (req, res) => {
       });
     }
 
-    // Then, find all comments for this post
+    // Check if post is private and user is not the owner
+    if (
+      post.privacy === "private" &&
+      (!req.user || post.user._id.toString() !== req.user.id)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to access this post",
+      });
+    }
+
+    // Always include comments for consistency
+    // Find all comments for this post
     const comments = await Comment.find({
       post: req.params.id,
       parentComment: null, // Only top-level comments
@@ -222,23 +240,14 @@ const getPost = async (req, res) => {
 
     // Add comments to the post object
     post.comments = comments;
-
-    // Check if post is private and user is not the owner
-    if (
-      post.privacy === "private" &&
-      (!req.user || post.user._id.toString() !== req.user.id)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to access this post",
-      });
-    }
+    console.log(`Found ${comments.length} comments for post ${req.params.id}`);
 
     res.status(200).json({
       success: true,
       data: post,
     });
   } catch (error) {
+    console.error(`Error getting post ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: "Server error",

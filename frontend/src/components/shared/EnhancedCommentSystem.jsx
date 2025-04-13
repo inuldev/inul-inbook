@@ -13,7 +13,7 @@
  * - Hierarchical display of comment replies
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Send,
   ThumbsUp,
@@ -40,6 +40,7 @@ import {
 
 import { formatDate } from "@/lib/utils";
 import userStore from "@/store/userStore";
+import usePostStore from "@/store/postStore";
 import { addPostComment } from "@/lib/postInteractionHelpers";
 import {
   toggleCommentLike,
@@ -51,7 +52,6 @@ import {
 const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
   const { user } = userStore();
   const [commentText, setCommentText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingComment, setEditingComment] = useState(null);
   const [editText, setEditText] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
@@ -59,10 +59,17 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
   const [expandedReplies, setExpandedReplies] = useState({});
   const [commentLikes, setCommentLikes] = useState({});
   const [commentLikeCounts, setCommentLikeCounts] = useState({});
-  
-  const commentInputRef = useRef(null);
-  const replyInputRef = useRef(null);
+
+  // State for show more/less comments
+  const [visibleCommentCount, setVisibleCommentCount] = useState(3);
+  const [showAllComments, setShowAllComments] = useState(false);
+
+  // State for tracking visible replies per comment
+  const [visibleRepliesCount, setVisibleRepliesCount] = useState({});
+
   const editInputRef = useRef(null);
+  const replyInputRef = useRef(null);
+  const commentInputRef = useRef(null);
 
   // Focus input when component mounts
   useEffect(() => {
@@ -70,13 +77,13 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       commentInputRef.current.focus();
     }
   }, []);
-  
+
   // Initialize comment likes state
   useEffect(() => {
     if (post?.comments?.length > 0) {
       const initialLikes = {};
       const initialLikeCounts = {};
-      
+
       post.comments.forEach((comment) => {
         // Check if current user has liked this comment
         const isLiked = comment.likes?.some((like) => {
@@ -117,37 +124,73 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
   }, [post?.comments, user?._id]);
 
   // Handle comment submission
-  const handleAddComment = async () => {
-    if (!commentText.trim() || isSubmitting) return;
+  const handleAddComment = () => {
+    if (!commentText.trim()) return;
 
-    try {
-      setIsSubmitting(true);
-      
-      // Use the standardized helper function
-      await addPostComment(
-        post._id,
-        commentText,
-        setCommentText,
-        (count) => {
-          if (onCommentAdded) onCommentAdded(count);
-        },
-        setIsSubmitting
-      );
-      
-      // Clear input after submission
-      setCommentText("");
-    } catch (error) {
+    // Store the comment text before clearing input
+    const commentToSend = commentText.trim();
+
+    // Clear input immediately for better UX
+    setCommentText("");
+
+    // Create a temporary comment for immediate display
+    const tempId = `temp-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
+    const tempComment = {
+      _id: tempId,
+      text: commentToSend,
+      user: user,
+      createdAt: new Date().toISOString(),
+      likes: [],
+      likeCount: 0,
+      replies: [],
+      replyCount: 0,
+      isTemp: true, // Mark as temporary
+    };
+
+    // Add temporary comment to UI immediately
+    const updatedComments = [tempComment, ...(post.comments || [])];
+    post.comments = updatedComments;
+
+    // Use the standardized helper function without waiting
+    // But don't call onCommentAdded since we've already added the temp comment
+    addPostComment(
+      post._id,
+      commentToSend,
+      setCommentText,
+      (count) => {
+        // Only update the count, not add another comment
+        if (onCommentAdded) onCommentAdded(count);
+      },
+      null, // Don't add another temporary comment
+      (newComment) => {
+        // Replace temporary comment with real one if needed
+        if (post.comments) {
+          const index = post.comments.findIndex(
+            (c) => c.isTemp && c._id === tempId
+          );
+          if (index !== -1 && newComment) {
+            post.comments[index] = { ...newComment, isTemp: false };
+          }
+        }
+      }
+    ).catch((error) => {
       console.error("Error adding comment:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+      // Remove temporary comment on error
+      if (post.comments) {
+        post.comments = post.comments.filter(
+          (c) => !c.isTemp || c._id !== tempId
+        );
+      }
+    });
   };
-  
+
   // Handle comment like toggle
   const handleLikeComment = async (commentId) => {
     const isLiked = commentLikes[commentId] || false;
     const currentCount = commentLikeCounts[commentId] || 0;
-    
+
     // Update state optimistically
     setCommentLikes((prev) => ({
       ...prev,
@@ -160,23 +203,53 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
     }));
 
     try {
-      // Call the API
+      // Create updater functions for the like state and count
+      const updateLikeState = (newLikedState) => {
+        setCommentLikes((prev) => ({
+          ...prev,
+          [commentId]: newLikedState,
+        }));
+      };
+
+      const updateLikeCount = (newCount) => {
+        setCommentLikeCounts((prev) => ({
+          ...prev,
+          [commentId]: newCount,
+        }));
+      };
+
+      // Call the API with post ID to ensure store is updated
       await toggleCommentLike(
         commentId,
+        post._id, // Pass the post ID
         isLiked,
-        (newLikedState) => {
+        updateLikeState,
+        updateLikeCount
+      );
+
+      // After the API call, refresh the comments from the post store
+      const postStore = usePostStore.getState();
+      const updatedPost = postStore.posts.find((p) => p._id === post._id);
+
+      if (updatedPost && updatedPost.comments) {
+        // Find the updated comment
+        const updatedComment = updatedPost.comments.find(
+          (c) => c._id === commentId
+        );
+
+        if (updatedComment) {
+          // Update the like state and count with the latest data from the server
           setCommentLikes((prev) => ({
             ...prev,
-            [commentId]: newLikedState,
+            [commentId]: updatedComment.isLiked || false,
           }));
-        },
-        (newCount) => {
+
           setCommentLikeCounts((prev) => ({
             ...prev,
-            [commentId]: newCount,
+            [commentId]: updatedComment.likeCount || 0,
           }));
         }
-      );
+      }
     } catch (error) {
       // Revert on error
       setCommentLikes((prev) => ({
@@ -192,12 +265,20 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       console.error("Error toggling comment like:", error);
     }
   };
-  
+
   // Handle edit comment
   const handleEditComment = (commentId, text) => {
+    // Store the original comment text in a data attribute for potential rollback
+    const commentElement = document.querySelector(
+      `[data-comment-id="${commentId}"]`
+    );
+    if (commentElement) {
+      commentElement.dataset.originalText = text;
+    }
+
     setEditingComment(commentId);
     setEditText(text);
-    
+
     // Focus the edit input after a short delay to allow rendering
     setTimeout(() => {
       if (editInputRef.current) {
@@ -205,48 +286,215 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       }
     }, 50);
   };
-  
+
   // Handle save edited comment
-  const handleSaveEdit = async (commentId) => {
-    if (!editText.trim() || isSubmitting) return;
-    
-    try {
-      setIsSubmitting(true);
-      
-      await updateComment(commentId, post._id, editText, () => {
-        // Reset editing state
-        setEditingComment(null);
-        setEditText("");
-      });
-    } catch (error) {
-      console.error("Error updating comment:", error);
-    } finally {
-      setIsSubmitting(false);
+  const handleSaveEdit = (commentId) => {
+    if (!editText.trim()) return;
+
+    // Find the comment to update - could be a top-level comment or a reply
+    let foundComment = null;
+
+    // First check if it's a top-level comment
+    foundComment = post.comments.find((c) => c._id === commentId);
+
+    // If not found, check if it's a reply
+    if (!foundComment) {
+      // Search through all comments' replies
+      for (const comment of post.comments) {
+        if (comment.replies && comment.replies.length > 0) {
+          const reply = comment.replies.find((r) => r._id === commentId);
+          if (reply) {
+            foundComment = reply;
+            break;
+          }
+        }
+      }
     }
+
+    if (!foundComment) {
+      console.error("Comment or reply not found");
+      return;
+    }
+
+    // Update the comment text immediately in UI
+    foundComment.text = editText.trim();
+    foundComment.updatedAt = new Date().toISOString();
+
+    // Reset editing state immediately
+    setEditingComment(null);
+    setEditText("");
+
+    // Store original text for potential rollback
+    const originalText = foundComment.text;
+
+    // Find parent comment ID if it's a reply
+    let parentCommentId = null;
+    if (!post.comments.find((c) => c._id === commentId)) {
+      // It's a reply, find the parent comment
+      for (const comment of post.comments) {
+        if (
+          comment.replies &&
+          comment.replies.some((r) => r._id === commentId)
+        ) {
+          parentCommentId = comment._id;
+          break;
+        }
+      }
+    }
+
+    // Call the API in the background
+    updateComment(commentId, post._id, editText, null, parentCommentId).catch(
+      (error) => {
+        console.error("Error updating comment:", error);
+        // Revert the comment text on error
+        if (foundComment) {
+          // Revert to original text
+          foundComment.text = originalText;
+          delete foundComment.updatedAt;
+
+          // Also try to refresh the post data in the background
+          const postStore = usePostStore.getState();
+          postStore.fetchPost(post._id, true, true).catch((err) => {
+            console.warn(
+              `Error refreshing post after failed edit: ${err.message}`
+            );
+          });
+        }
+      }
+    );
   };
-  
+
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditingComment(null);
     setEditText("");
   };
-  
+
   // Handle delete comment
-  const handleDeleteComment = async (commentId) => {
-    try {
-      await deleteComment(commentId, post._id, () => {
-        // Comment deletion is handled by the post store
-      });
-    } catch (error) {
-      console.error("Error deleting comment:", error);
+  const handleDeleteComment = (commentId) => {
+    // Check if it's a top-level comment or a reply
+    const isTopLevelComment = post.comments.some((c) => c._id === commentId);
+    let deletedComment;
+    let parentComment;
+
+    if (isTopLevelComment) {
+      // It's a top-level comment
+      const commentIndex = post.comments.findIndex((c) => c._id === commentId);
+      if (commentIndex === -1) {
+        console.error("Comment not found");
+        return;
+      }
+
+      // Remove the comment from UI immediately
+      deletedComment = post.comments[commentIndex];
+      post.comments.splice(commentIndex, 1);
+    } else {
+      // It's a reply, find the parent comment and the reply
+      for (const comment of post.comments) {
+        if (comment.replies && comment.replies.length > 0) {
+          const replyIndex = comment.replies.findIndex(
+            (r) => r._id === commentId
+          );
+          if (replyIndex !== -1) {
+            parentComment = comment;
+            deletedComment = comment.replies[replyIndex];
+            comment.replies.splice(replyIndex, 1);
+            break;
+          }
+        }
+      }
+
+      if (!deletedComment) {
+        console.error("Reply not found");
+        return;
+      }
     }
+
+    // Also update the commentLikes and commentLikeCounts state
+    setCommentLikes((prev) => {
+      const newState = { ...prev };
+      delete newState[commentId];
+
+      // Also remove likes for replies if this was a parent comment
+      if (deletedComment.replies && deletedComment.replies.length > 0) {
+        deletedComment.replies.forEach((reply) => {
+          delete newState[reply._id];
+        });
+      }
+
+      return newState;
+    });
+
+    setCommentLikeCounts((prev) => {
+      const newState = { ...prev };
+      delete newState[commentId];
+
+      // Also remove like counts for replies if this was a parent comment
+      if (deletedComment.replies && deletedComment.replies.length > 0) {
+        deletedComment.replies.forEach((reply) => {
+          delete newState[reply._id];
+        });
+      }
+
+      return newState;
+    });
+
+    // Call the API in the background
+    deleteComment(commentId, post._id, parentComment?._id).catch((error) => {
+      console.error("Error deleting comment:", error);
+      // Restore the comment on error if needed
+      if (isTopLevelComment) {
+        // Find the index again in case the array has changed
+        const index = post.comments.findIndex(
+          (c) => c._id === deletedComment._id
+        );
+        if (index === -1) {
+          // If not found, add it back
+          post.comments.unshift(deletedComment);
+        }
+      } else if (parentComment) {
+        // Add the reply back to the parent comment
+        if (!parentComment.replies.some((r) => r._id === deletedComment._id)) {
+          parentComment.replies.push(deletedComment);
+        }
+      }
+
+      // Restore the likes state
+      if (deletedComment._id) {
+        setCommentLikes((prev) => ({
+          ...prev,
+          [deletedComment._id]: deletedComment.isLiked || false,
+        }));
+
+        setCommentLikeCounts((prev) => ({
+          ...prev,
+          [deletedComment._id]: deletedComment.likeCount || 0,
+        }));
+
+        // Restore likes for replies too
+        if (deletedComment.replies && deletedComment.replies.length > 0) {
+          const updatedLikes = { ...commentLikes };
+          const updatedLikeCounts = { ...commentLikeCounts };
+
+          deletedComment.replies.forEach((reply) => {
+            if (reply._id) {
+              updatedLikes[reply._id] = reply.isLiked || false;
+              updatedLikeCounts[reply._id] = reply.likeCount || 0;
+            }
+          });
+
+          setCommentLikes(updatedLikes);
+          setCommentLikeCounts(updatedLikeCounts);
+        }
+      }
+    });
   };
-  
+
   // Handle reply to comment
   const handleReplyToComment = (commentId) => {
     setReplyingTo(commentId);
     setReplyText("");
-    
+
     // Focus the reply input after a short delay to allow rendering
     setTimeout(() => {
       if (replyInputRef.current) {
@@ -254,44 +502,110 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       }
     }, 50);
   };
-  
+
   // Handle save reply
-  const handleSaveReply = async (commentId) => {
-    if (!replyText.trim() || isSubmitting) return;
-    
-    try {
-      setIsSubmitting(true);
-      
-      await replyToComment(commentId, post._id, replyText, () => {
-        // Reset replying state
-        setReplyingTo(null);
-        setReplyText("");
-        
-        // Expand replies for this comment
-        setExpandedReplies((prev) => ({
-          ...prev,
-          [commentId]: true,
-        }));
-      });
-    } catch (error) {
-      console.error("Error replying to comment:", error);
-    } finally {
-      setIsSubmitting(false);
+  const handleSaveReply = (commentId) => {
+    if (!replyText.trim()) return;
+
+    // Find the parent comment
+    const parentComment = post.comments.find((c) => c._id === commentId);
+    if (!parentComment) {
+      console.error("Parent comment not found");
+      return;
     }
+
+    // Create a temporary reply for immediate display
+    const tempReplyId = `temp-reply-${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 9)}`;
+    const tempReply = {
+      _id: tempReplyId,
+      text: replyText.trim(),
+      user: user,
+      createdAt: new Date().toISOString(),
+      likes: [],
+      likeCount: 0,
+      parentComment: commentId,
+      isTemp: true, // Mark as temporary
+    };
+
+    // Add temporary reply to UI immediately
+    if (!parentComment.replies) parentComment.replies = [];
+    parentComment.replies.push(tempReply);
+    parentComment.replyCount = (parentComment.replyCount || 0) + 1;
+
+    // Clear input immediately for better UX
+    const replyToSend = replyText.trim();
+    setReplyText("");
+
+    // Reset replying state immediately
+    setReplyingTo(null);
+
+    // Expand replies for this comment
+    setExpandedReplies((prev) => ({
+      ...prev,
+      [commentId]: true,
+    }));
+
+    // Call the API in the background
+    replyToComment(commentId, post._id, replyToSend).catch((error) => {
+      console.error("Error replying to comment:", error);
+      // Remove temporary reply on error
+      const parentComment = post.comments.find((c) => c._id === commentId);
+      if (parentComment && parentComment.replies) {
+        parentComment.replies = parentComment.replies.filter((r) => !r.isTemp);
+        parentComment.replyCount = parentComment.replies.length;
+      }
+    });
   };
-  
+
   // Handle cancel reply
   const handleCancelReply = () => {
     setReplyingTo(null);
     setReplyText("");
   };
-  
+
   // Toggle expanded replies
   const toggleReplies = (commentId) => {
     setExpandedReplies((prev) => ({
       ...prev,
       [commentId]: !prev[commentId],
     }));
+
+    // Reset visible replies count when collapsing
+    if (expandedReplies[commentId]) {
+      setVisibleRepliesCount((prev) => ({
+        ...prev,
+        [commentId]: 3, // Reset to initial count
+      }));
+    }
+  };
+
+  // Show more replies for a comment
+  const showMoreReplies = (commentId) => {
+    const comment = post.comments.find((c) => c._id === commentId);
+    if (!comment || !comment.replies) return;
+
+    const currentVisible = visibleRepliesCount[commentId] || 3;
+    const newVisible = Math.min(currentVisible + 3, comment.replies.length);
+
+    setVisibleRepliesCount((prev) => ({
+      ...prev,
+      [commentId]: newVisible,
+    }));
+  };
+
+  // Show less replies for a comment
+  const showLessReplies = (commentId) => {
+    setVisibleRepliesCount((prev) => ({
+      ...prev,
+      [commentId]: 3, // Reset to initial count
+    }));
+  };
+
+  // Toggle show all comments
+  const toggleShowAllComments = () => {
+    setShowAllComments((prev) => !prev);
   };
 
   // Render a single comment
@@ -300,56 +614,66 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
     const likeCount = commentLikeCounts[comment._id] || 0;
     const isExpanded = expandedReplies[comment._id] || false;
     const hasReplies = comment.replies && comment.replies.length > 0;
-    
+
     return (
-      <div key={comment._id} className={`flex items-start space-x-2 ${isReply ? 'ml-8 mt-2' : 'mb-4'}`}>
+      <div
+        className={`flex items-start space-x-2 ${
+          isReply ? "ml-8 mt-2" : "mb-4"
+        }`}
+      >
         <Avatar className="h-8 w-8 flex-shrink-0">
           <AvatarImage src={comment?.user?.profilePicture} />
           <AvatarFallback className="dark:bg-gray-400">
             {comment?.user?.username?.substring(0, 2).toUpperCase() || "??"}
           </AvatarFallback>
         </Avatar>
-        
+
         <div className="flex-1">
           {/* Comment content */}
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2">
+          <div
+            className="bg-gray-100 dark:bg-gray-800 rounded-lg p-2"
+            data-comment-id={comment._id}
+          >
             <div className="flex justify-between items-start">
               <div className="w-full">
                 <div className="flex justify-between items-center">
                   <p className="font-semibold text-sm">
                     {comment?.user?.username || "Unknown User"}
                   </p>
-                  
+
                   {/* Edit/Delete dropdown for own comments */}
-                  {user?._id === comment?.user?._id && editingComment !== comment._id && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="h-6 w-6 p-0 dark:text-gray-300 ml-2"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleEditComment(comment._id, comment.text)}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteComment(comment._id)}
-                          className="text-red-600 dark:text-red-400"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                  {user?._id === comment?.user?._id &&
+                    editingComment !== comment._id && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-6 w-6 p-0 dark:text-gray-300 ml-2"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              handleEditComment(comment._id, comment.text)
+                            }
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteComment(comment._id)}
+                            className="text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                 </div>
-                
+
                 {/* Comment text or edit form */}
                 {editingComment === comment._id ? (
                   <div className="mt-1">
@@ -359,7 +683,6 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                         className="flex-1 mr-2 text-sm"
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        disabled={isSubmitting}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -373,7 +696,7 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                         size="icon"
                         variant="ghost"
                         onClick={() => handleSaveEdit(comment._id)}
-                        disabled={!editText.trim() || isSubmitting}
+                        disabled={!editText.trim()}
                         className="h-8 w-8"
                       >
                         <Check className="h-4 w-4" />
@@ -394,33 +717,37 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
               </div>
             </div>
           </div>
-          
+
           {/* Comment metadata and actions */}
           <div className="flex items-center mt-1 text-xs text-gray-500 dark:text-gray-400">
             <span className="mr-2">{formatDate(comment.createdAt)}</span>
-            
+
             {/* Like button */}
             <Button
               variant="ghost"
               size="sm"
-              className={`h-6 px-2 ${isLiked ? 'text-blue-500 dark:text-blue-400' : ''}`}
+              className={`h-6 px-2 ${
+                isLiked ? "text-blue-500 dark:text-blue-400" : ""
+              }`}
               onClick={() => handleLikeComment(comment._id)}
             >
               <ThumbsUp className="h-3 w-3 mr-1" />
               {likeCount > 0 && <span>{likeCount}</span>}
             </Button>
-            
-            {/* Reply button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2"
-              onClick={() => handleReplyToComment(comment._id)}
-            >
-              <Reply className="h-3 w-3 mr-1" />
-              Reply
-            </Button>
-            
+
+            {/* Reply button - only show for top-level comments */}
+            {!isReply && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2"
+                onClick={() => handleReplyToComment(comment._id)}
+              >
+                <Reply className="h-3 w-3 mr-1" />
+                Reply
+              </Button>
+            )}
+
             {/* Show/hide replies button */}
             {hasReplies && (
               <Button
@@ -437,13 +764,14 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                 ) : (
                   <>
                     <ChevronDown className="h-3 w-3 mr-1" />
-                    Show {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
+                    Show {comment.replies.length}{" "}
+                    {comment.replies.length === 1 ? "reply" : "replies"}
                   </>
                 )}
               </Button>
             )}
           </div>
-          
+
           {/* Reply input */}
           {replyingTo === comment._id && (
             <div className="mt-2 flex items-center">
@@ -460,7 +788,7 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                   placeholder={`Reply to ${comment?.user?.username}...`}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={false}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -474,7 +802,7 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                   size="sm"
                   className="h-8"
                   onClick={() => handleSaveReply(comment._id)}
-                  disabled={!replyText.trim() || isSubmitting}
+                  disabled={!replyText.trim()}
                 >
                   <Send className="h-3 w-3" />
                 </Button>
@@ -489,11 +817,44 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
               </div>
             </div>
           )}
-          
+
           {/* Replies */}
           {hasReplies && isExpanded && (
             <div className="mt-2">
-              {comment.replies.map(reply => renderComment(reply, true))}
+              {/* Show limited replies with show more/less */}
+              {comment.replies
+                .filter((reply) => reply._id) // Only include replies with valid IDs
+                .slice(0, visibleRepliesCount[comment._id] || 3) // Limit visible replies
+                .map((reply) => (
+                  <div key={reply._id || `fallback-reply-${Math.random()}`}>
+                    {renderComment(reply, true)}
+                  </div>
+                ))}
+
+              {/* Show more/less replies buttons */}
+              {comment.replies.filter((reply) => reply._id).length >
+                (visibleRepliesCount[comment._id] || 3) && (
+                <div className="flex justify-end mt-1">
+                  <button
+                    onClick={() => showMoreReplies(comment._id)}
+                    className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                  >
+                    Show more replies
+                  </button>
+                </div>
+              )}
+
+              {(visibleRepliesCount[comment._id] || 3) > 3 &&
+                comment.replies.filter((reply) => reply._id).length > 3 && (
+                  <div className="flex justify-end mt-1">
+                    <button
+                      onClick={() => showLessReplies(comment._id)}
+                      className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    >
+                      Show less replies
+                    </button>
+                  </div>
+                )}
             </div>
           )}
         </div>
@@ -518,7 +879,7 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
             placeholder="Write a comment..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            disabled={isSubmitting}
+            disabled={false}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -529,7 +890,7 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
           <Button
             size="sm"
             onClick={handleAddComment}
-            disabled={!commentText.trim() || isSubmitting}
+            disabled={!commentText.trim()}
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -540,9 +901,31 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       <ScrollArea className="h-[300px] w-full rounded-md border p-4">
         {post?.comments && post.comments.length > 0 ? (
           <div className="space-y-4">
+            {/* Filter and limit top-level comments */}
             {post.comments
-              .filter(comment => !comment.parentComment) // Only show top-level comments
-              .map(comment => renderComment(comment))}
+              .filter((comment) => !comment.parentComment && comment._id) // Only show top-level comments with valid IDs
+              .slice(0, showAllComments ? undefined : visibleCommentCount) // Limit visible comments
+              .map((comment) => (
+                <div key={comment._id || `fallback-${Math.random()}`}>
+                  {renderComment(comment)}
+                </div>
+              ))}
+
+            {/* Show more/less comments button */}
+            {post.comments.filter(
+              (comment) => !comment.parentComment && comment._id
+            ).length > visibleCommentCount && (
+              <div className="flex justify-center mt-2">
+                <button
+                  onClick={toggleShowAllComments}
+                  className="text-sm text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                >
+                  {showAllComments
+                    ? "Show less comments"
+                    : "Show more comments"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center text-gray-500 dark:text-gray-400 py-4">

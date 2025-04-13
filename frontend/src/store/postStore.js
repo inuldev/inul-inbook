@@ -32,10 +32,22 @@ const usePostStore = create((set, get) => ({
    * Fetch all posts with pagination
    * @param {number} page - Page number
    * @param {number} limit - Number of posts per page
+   * @param {boolean} forceRefresh - Whether to force a refresh from the server
    * @returns {Promise<Array>} - Array of posts
    */
-  fetchPosts: async (page = 1, limit = 10) => {
-    set({ loading: true, error: null });
+  fetchPosts: async (page = 1, limit = 10, forceRefresh = false) => {
+    // Check if we already have posts and we're not forcing a refresh
+    const existingPosts = get().posts;
+    if (existingPosts.length > 0 && !forceRefresh) {
+      console.log("Using cached posts");
+      return existingPosts;
+    }
+
+    // Only set loading to true if we don't have posts yet
+    if (existingPosts.length === 0) {
+      set({ loading: true, error: null });
+    }
+
     try {
       const response = await fetch(
         `${config.backendUrl}/api/posts?page=${page}&limit=${limit}`,
@@ -45,6 +57,7 @@ const usePostStore = create((set, get) => ({
           headers: {
             "Content-Type": "application/json",
           },
+          cache: forceRefresh ? "no-store" : "default", // Use browser cache unless forcing refresh
           timeout: config.apiTimeouts.medium,
         }
       );
@@ -61,17 +74,23 @@ const usePostStore = create((set, get) => ({
         get().processPost(post, currentUser)
       );
 
+      // Add timestamp for cache control
+      const postsWithTimestamp = processedPosts.map((post) => ({
+        ...post,
+        lastFetched: new Date().getTime(),
+      }));
+
       set({
-        posts: processedPosts,
+        posts: postsWithTimestamp,
         pagination: data.pagination,
         loading: false,
       });
 
-      return processedPosts;
+      return postsWithTimestamp;
     } catch (error) {
       console.error("Error fetching posts:", error);
       set({ error: error.message, loading: false });
-      return [];
+      return existingPosts.length > 0 ? existingPosts : [];
     }
   },
 
@@ -125,21 +144,55 @@ const usePostStore = create((set, get) => ({
   /**
    * Fetch a single post by ID
    * @param {string} postId - Post ID
+   * @param {boolean} includeComments - Whether to include comments in the response
+   * @param {boolean} forceRefresh - Whether to force a refresh from the server
    * @returns {Promise<Object>} - Post object
    */
-  fetchPost: async (postId) => {
-    console.log("fetchPost called with postId:", postId);
+  fetchPost: async (postId, includeComments = true, forceRefresh = false) => {
+    console.log(
+      "fetchPost called with postId:",
+      postId,
+      "includeComments:",
+      includeComments,
+      "forceRefresh:",
+      forceRefresh
+    );
+
+    // Check if we already have this post in the store
+    const existingPost = get().posts.find((p) => p._id === postId);
+
+    // If we have the post and it has comments (if needed) and we're not forcing a refresh,
+    // return it immediately without making an API call
+    if (
+      existingPost &&
+      (!includeComments ||
+        (includeComments &&
+          existingPost.comments &&
+          existingPost.comments.length > 0)) &&
+      !forceRefresh
+    ) {
+      console.log("Using cached post data");
+      return existingPost;
+    }
+
+    // If we don't have the post or need to refresh, proceed with API call
     set({ loading: true, error: null });
     try {
       console.log("Making API request to fetch post");
-      const response = await fetch(`${config.backendUrl}/api/posts/${postId}`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        timeout: config.apiTimeouts.medium,
-      });
+
+      // Always include comments to ensure consistency
+      const response = await fetch(
+        `${config.backendUrl}/api/posts/${postId}?includeComments=true`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: forceRefresh ? "no-store" : "default", // Use browser cache unless forcing refresh
+          timeout: config.apiTimeouts.medium,
+        }
+      );
 
       console.log("API response received");
       const data = await response.json();
@@ -150,21 +203,61 @@ const usePostStore = create((set, get) => ({
         throw new Error(data.message || "Failed to fetch post");
       }
 
+      let postData = data.data;
+
       // Process post to ensure consistent format
       const currentUser = userStore.getState().user;
       console.log("Processing post data with current user:", currentUser?._id);
-      const processedPost = get().processPost(data.data, currentUser);
-      console.log("Processed post:", processedPost);
+      const processedPost = get().processPost(postData, currentUser);
+      console.log(
+        "Processed post with",
+        processedPost.comments?.length || 0,
+        "comments"
+      );
 
       // Update the post in the store if it exists
       set((state) => {
         console.log("Updating post in store");
-        return {
-          posts: state.posts.map((post) =>
-            post._id === postId ? processedPost : post
-          ),
-          loading: false,
-        };
+        // First check if the post already exists in the store
+        const existingPostIndex = state.posts.findIndex(
+          (p) => p._id === postId
+        );
+
+        if (existingPostIndex >= 0) {
+          // Update existing post but preserve comments if they exist and we're not explicitly fetching comments
+          const existingPost = state.posts[existingPostIndex];
+          const updatedPost = {
+            ...processedPost,
+            // If we're not explicitly fetching comments and the existing post has comments, keep them
+            comments: includeComments
+              ? processedPost.comments
+              : processedPost.comments || existingPost.comments || [],
+            commentCount: includeComments
+              ? processedPost.commentCount
+              : processedPost.commentCount || existingPost.commentCount || 0,
+            // Add a timestamp for cache control
+            lastFetched: new Date().getTime(),
+          };
+
+          const updatedPosts = [...state.posts];
+          updatedPosts[existingPostIndex] = updatedPost;
+          return {
+            posts: updatedPosts,
+            loading: false,
+          };
+        } else {
+          // Add new post to the store with timestamp
+          return {
+            posts: [
+              ...state.posts,
+              {
+                ...processedPost,
+                lastFetched: new Date().getTime(),
+              },
+            ],
+            loading: false,
+          };
+        }
       });
 
       console.log("Returning processed post");
@@ -614,6 +707,7 @@ const usePostStore = create((set, get) => ({
         likeCount: 0,
         replies: [],
         replyCount: 0,
+        parentComment: null, // Ensure this is set for proper filtering
       };
 
       // Update the post in the store
@@ -653,7 +747,8 @@ const usePostStore = create((set, get) => ({
 
       // After adding a comment, fetch the updated post to ensure we have all comments
       try {
-        await get().fetchPost(postId);
+        // Use true for includeComments to ensure we get the latest comments
+        await get().fetchPost(postId, true);
       } catch (error) {
         console.warn(
           `Error fetching updated post after comment: ${error.message}`
@@ -805,9 +900,68 @@ const usePostStore = create((set, get) => ({
     const likes = Array.isArray(post.likes) ? post.likes : [];
     console.log("Likes array:", likes);
 
-    // Ensure comments is always an array
-    const comments = Array.isArray(post.comments) ? post.comments : [];
-    console.log("Comments array length:", comments.length);
+    // Ensure comments is always an array and properly structured
+    let comments = Array.isArray(post.comments) ? post.comments : [];
+
+    // Process comments to ensure they have all required fields
+    comments = comments.map((comment) => {
+      // Ensure likes is always an array for comments
+      const commentLikes = Array.isArray(comment.likes) ? comment.likes : [];
+
+      // Check if the current user has liked this comment
+      let isCommentLiked = false;
+      if (currentUser && currentUser._id) {
+        isCommentLiked = commentLikes.some((like) => {
+          if (typeof like === "string") {
+            return like === currentUser._id;
+          } else if (like && typeof like === "object") {
+            return like._id === currentUser._id;
+          }
+          return false;
+        });
+      }
+
+      // Ensure replies is always an array
+      const replies = Array.isArray(comment.replies) ? comment.replies : [];
+
+      // Process replies to ensure they have all required fields
+      const processedReplies = replies.map((reply) => {
+        // Ensure likes is always an array for replies
+        const replyLikes = Array.isArray(reply.likes) ? reply.likes : [];
+
+        // Check if the current user has liked this reply
+        let isReplyLiked = false;
+        if (currentUser && currentUser._id) {
+          isReplyLiked = replyLikes.some((like) => {
+            if (typeof like === "string") {
+              return like === currentUser._id;
+            } else if (like && typeof like === "object") {
+              return like._id === currentUser._id;
+            }
+            return false;
+          });
+        }
+
+        return {
+          ...reply,
+          likes: replyLikes,
+          likeCount: Math.max(reply.likeCount || 0, replyLikes.length),
+          isLiked: !!isReplyLiked,
+          parentComment: comment._id, // Ensure parent comment ID is set
+        };
+      });
+
+      return {
+        ...comment,
+        likes: commentLikes,
+        likeCount: Math.max(comment.likeCount || 0, commentLikes.length),
+        isLiked: !!isCommentLiked,
+        replies: processedReplies,
+        replyCount: processedReplies.length,
+      };
+    });
+
+    console.log("Processed comments array length:", comments.length);
 
     // Check if the current user has liked this post
     let isLiked = false;
