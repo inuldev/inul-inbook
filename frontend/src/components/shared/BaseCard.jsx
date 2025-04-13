@@ -16,6 +16,7 @@
 
 // import { format } from "date-fns";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
 import {
@@ -80,9 +81,32 @@ const BaseCard = ({
   onDelete = null,
   onEdit = null,
 }) => {
-  // Get user from store
-  const userState = userStore();
-  const { user } = userState;
+  // Initialize router for navigation
+  const router = useRouter();
+
+  // Get user from store using selector for latest data
+  const user = userStore((state) => state.user);
+
+  // Set up an effect to refresh user data periodically
+  useEffect(() => {
+    // Refresh user data when component mounts
+    const refreshUserData = () => {
+      userStore
+        .getState()
+        .getCurrentUser()
+        .catch((err) => {
+          console.error("Error refreshing user data in BaseCard:", err);
+        });
+    };
+
+    // Initial refresh
+    refreshUserData();
+
+    // Set up interval for periodic refresh (every 30 seconds)
+    const refreshInterval = setInterval(refreshUserData, 30000);
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   // Get comment store
   const commentStore = useCommentStore();
@@ -316,15 +340,25 @@ const BaseCard = ({
         <CardContent className="p-6 dark:text-white">
           {/* Header with user info and actions */}
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3 cursor-pointer">
-              <Avatar>
-                <AvatarImage src={post?.user?.profilePicture} />
+            <div className="flex items-center space-x-3">
+              <Avatar
+                className="cursor-pointer hover:ring-2 hover:ring-primary transition-all duration-200"
+                onClick={() => router.push(`/user-profile/${post?.user?._id}`)}
+              >
+                {/* Add key with timestamp to force re-render when post user changes */}
+                <AvatarImage
+                  key={`avatar-${post?.user?._id}-${Date.now()}`}
+                  src={post?.user?.profilePicture}
+                />
                 <AvatarFallback className="dark:bg-gray-400">
                   {post?.user?.username?.substring(0, 2).toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-semibold dark:text-white">
+              <div
+                className="cursor-pointer"
+                onClick={() => router.push(`/user-profile/${post?.user?._id}`)}
+              >
+                <p className="font-semibold dark:text-white hover:underline">
                   {post?.user?.username || "Unknown User"}
                 </p>
                 <div className="flex items-center text-gray-500 dark:text-gray-400">

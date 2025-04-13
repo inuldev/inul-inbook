@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { Play, X } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 
@@ -18,6 +19,7 @@ import {
 import useStoryStore from "@/store/storyStore";
 
 const StoryCard = ({ story }) => {
+  const router = useRouter();
   const { viewStory } = useStoryStore();
   const [isOpen, setIsOpen] = useState(false);
   const videoRef = useRef(null);
@@ -110,15 +112,30 @@ const StoryCard = ({ story }) => {
             </div>
           )}
           <div className="absolute top-2 left-2 ring-2 ring-blue-500 rounded-full z-20">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={story?.user?.profilePicture || ""} />
+            <Avatar
+              className="h-8 w-8 cursor-pointer hover:ring-2 hover:ring-white transition-all duration-200"
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent opening the story
+                router.push(`/user-profile/${story?.user?._id}`);
+              }}
+            >
+              <AvatarImage
+                key={`story-avatar-${story?.user?._id}-${Date.now()}`}
+                src={story?.user?.profilePicture || ""}
+              />
               <AvatarFallback className="dark:bg-gray-600">
                 {story?.user?.username?.charAt(0) || "U"}
               </AvatarFallback>
             </Avatar>
           </div>
-          <div className="absolute bottom-2 left-2 right-2 z-20">
-            <p className="text-white text-xs font-semibold truncate drop-shadow-md">
+          <div
+            className="absolute bottom-2 left-2 right-2 z-20 cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent opening the story
+              router.push(`/user-profile/${story?.user?._id}`);
+            }}
+          >
+            <p className="text-white text-xs font-semibold truncate drop-shadow-md hover:underline">
               {story?.user?.username || "User"}
             </p>
           </div>
@@ -131,13 +148,30 @@ const StoryCard = ({ story }) => {
           {/* Header with user info */}
           <DialogHeader className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black to-transparent">
             <DialogTitle className="text-white flex items-center">
-              <Avatar className="h-8 w-8 mr-2">
-                <AvatarImage src={story?.user?.profilePicture} />
+              <Avatar
+                className="h-8 w-8 mr-2 cursor-pointer hover:ring-2 hover:ring-white transition-all duration-200"
+                onClick={() => {
+                  handleClose();
+                  router.push(`/user-profile/${story?.user?._id}`);
+                }}
+              >
+                <AvatarImage
+                  key={`story-dialog-avatar-${story?.user?._id}-${Date.now()}`}
+                  src={story?.user?.profilePicture}
+                />
                 <AvatarFallback className="bg-gray-600">
                   {story?.user?.username?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
-              <span>{story?.user?.username || "User"}</span>
+              <span
+                className="cursor-pointer hover:underline"
+                onClick={() => {
+                  handleClose();
+                  router.push(`/user-profile/${story?.user?._id}`);
+                }}
+              >
+                {story?.user?.username || "User"}
+              </span>
             </DialogTitle>
             <DialogDescription className="sr-only"></DialogDescription>
           </DialogHeader>

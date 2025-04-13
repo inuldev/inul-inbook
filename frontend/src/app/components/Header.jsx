@@ -37,7 +37,9 @@ import {
 
 const Header = () => {
   const router = useRouter();
-  const { user, logout } = userStore();
+  // Gunakan selector untuk mendapatkan data user terbaru
+  const user = userStore((state) => state.user);
+  const logout = userStore((state) => state.logout);
   const { toggleSidebar } = useSidebarStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -51,6 +53,26 @@ const Header = () => {
 
   useEffect(() => {
     fetchPendingRequestsCount();
+
+    // Refresh user data to ensure we have the latest profile picture
+    userStore
+      .getState()
+      .getCurrentUser()
+      .catch((err) => {
+        console.error("Error refreshing user data:", err);
+      });
+
+    // Set up an interval to refresh user data periodically
+    const refreshInterval = setInterval(() => {
+      userStore
+        .getState()
+        .getCurrentUser()
+        .catch((err) => {
+          console.error("Error refreshing user data:", err);
+        });
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
   }, [fetchPendingRequestsCount]);
 
   // Handle search input change

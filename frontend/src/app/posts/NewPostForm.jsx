@@ -203,6 +203,9 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    Upload a photo (max 10MB) or video (max 100MB) for your post
+                  </p>
                   <CloudinaryUploader
                     onUploadComplete={handleMediaUploadComplete}
                     onUploadError={handleMediaUploadError}

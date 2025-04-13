@@ -577,6 +577,33 @@ const userStore = create((set, get) => ({
 
   clearErrors: () => set({ error: null }),
 
+  // Set user data with proper storage update
+  setUser: (userData) => {
+    // Update user data in state
+    set((state) => ({
+      user: state.user ? { ...state.user, ...userData } : userData,
+    }));
+
+    // Also update user data in storage for persistence
+    if (typeof window !== "undefined") {
+      try {
+        // Get current user data from storage
+        const currentUserJson = localStorage.getItem("auth_user");
+        if (currentUserJson) {
+          const currentUser = JSON.parse(currentUserJson);
+          // Merge with new data
+          const updatedUser = { ...currentUser, ...userData };
+          // Store back
+          localStorage.setItem("auth_user", JSON.stringify(updatedUser));
+          sessionStorage.setItem("auth_user", JSON.stringify(updatedUser));
+          console.log("Updated user data in storage");
+        }
+      } catch (error) {
+        console.error("Error updating user data in storage:", error);
+      }
+    }
+  },
+
   // Debug function to check user state
   checkUser: () => {
     const state = get();

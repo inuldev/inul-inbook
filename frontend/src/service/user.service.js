@@ -39,21 +39,44 @@ export const fetchUserProfile = async (userId) => {
  */
 export const updateUserProfile = async (userId, formData) => {
   try {
-    const response = await put(
-      `api/users/profile`,
-      formData,
-      {
-        // Don't set Content-Type header for FormData
-        headers: {},
-      },
-      "upload"
-    );
+    // Check if formData contains profilePicture
+    const hasProfilePicture = formData.has("profilePicture");
 
-    if (!response.success) {
-      throw new Error(response.message || "Failed to update profile");
+    // If there's a profile picture, use the profile-picture endpoint
+    if (hasProfilePicture) {
+      const response = await put(
+        `api/users/profile-picture`,
+        formData,
+        {
+          // Don't set Content-Type header for FormData
+          headers: {},
+        },
+        "upload"
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to update profile picture");
+      }
+
+      return response.data;
+    } else {
+      // Otherwise use the regular profile endpoint
+      const response = await put(
+        `api/users/profile`,
+        formData,
+        {
+          // Don't set Content-Type header for FormData
+          headers: {},
+        },
+        "upload"
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to update profile");
+      }
+
+      return response.data;
     }
-
-    return response.data;
   } catch (error) {
     console.error("Error updating user profile:", error);
     throw error;

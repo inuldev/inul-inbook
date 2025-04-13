@@ -12,24 +12,30 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 import { userFriendStore } from "@/store/userFriendsStore";
 import userStore from "@/store/userStore";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
-import { followUser } from "@/service/user.service";
+import { followUser, unfollowUser } from "@/service/user.service";
 
 const UserFriends = ({ id, isOwner }) => {
   const router = useRouter();
   const { user } = userStore();
-  const { 
-    fetchFollowing, 
-    following, 
-    loading, 
-    UnfollowUser, 
-    FollowUser 
-  } = userFriendStore();
-  
+  const { fetchFollowing, following, loading, UnfollowUser, FollowUser } =
+    userFriendStore();
+
   const [isCurrentUserFollowing, setIsCurrentUserFollowing] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const friendsPerPage = 6; // Menampilkan 6 teman per halaman (3 baris x 2 kolom)
 
   useEffect(() => {
     if (id) {
@@ -41,10 +47,25 @@ const UserFriends = ({ id, isOwner }) => {
   useEffect(() => {
     if (user && following.length > 0) {
       const followingMap = {};
-      following.forEach(friend => {
+      following.forEach((friend) => {
         // Check if the current user is following this friend
-        const isFollowing = user.following && user.following.includes(friend._id);
-        followingMap[friend._id] = isFollowing;
+        // First check if user.following is an array of IDs
+        if (Array.isArray(user.following)) {
+          followingMap[friend._id] = user.following.includes(friend._id);
+        }
+        // Then check if it's an array of objects with _id property
+        else if (
+          Array.isArray(user.following) &&
+          user.following.some((f) => typeof f === "object")
+        ) {
+          followingMap[friend._id] = user.following.some(
+            (f) => f._id === friend._id
+          );
+        }
+        // Default to false if we can't determine
+        else {
+          followingMap[friend._id] = false;
+        }
       });
       setIsCurrentUserFollowing(followingMap);
     }
@@ -52,39 +73,69 @@ const UserFriends = ({ id, isOwner }) => {
 
   const handleUnfollow = async (userId) => {
     try {
-      await UnfollowUser(userId);
-      showSuccessToast("You have unfollowed successfully");
-      
-      // Update local state
-      setIsCurrentUserFollowing(prev => ({
+      // First try using the store method
+      try {
+        await UnfollowUser(userId);
+      } catch (storeError) {
+        // If store method fails, try direct service call
+        console.warn(
+          "Store unfollow failed, trying direct service call",
+          storeError
+        );
+        await unfollowUser(userId);
+      }
+
+      showSuccessToast("Berhasil berhenti mengikuti");
+
+      // Update local state immediately for better UX
+      setIsCurrentUserFollowing((prev) => ({
         ...prev,
-        [userId]: false
+        [userId]: false,
       }));
-      
+
       // Refresh the friends list
       await fetchFollowing(id);
+
+      // Also refresh current user data to update following list
+      const { getCurrentUser } = userStore.getState();
+      await getCurrentUser();
     } catch (error) {
       console.error("Error unfollowing user:", error);
-      showErrorToast("Failed to unfollow user");
+      showErrorToast("Gagal berhenti mengikuti pengguna");
     }
   };
 
   const handleFollow = async (userId) => {
     try {
-      await FollowUser(userId);
-      showSuccessToast("You are now following this user");
-      
-      // Update local state
-      setIsCurrentUserFollowing(prev => ({
+      // First try using the store method
+      try {
+        await FollowUser(userId);
+      } catch (storeError) {
+        // If store method fails, try direct service call
+        console.warn(
+          "Store follow failed, trying direct service call",
+          storeError
+        );
+        await followUser(userId);
+      }
+
+      showSuccessToast("Berhasil mengikuti pengguna");
+
+      // Update local state immediately for better UX
+      setIsCurrentUserFollowing((prev) => ({
         ...prev,
-        [userId]: true
+        [userId]: true,
       }));
-      
+
       // Refresh the friends list
       await fetchFollowing(id);
+
+      // Also refresh current user data to update following list
+      const { getCurrentUser } = userStore.getState();
+      await getCurrentUser();
     } catch (error) {
       console.error("Error following user:", error);
-      showErrorToast("Failed to follow user");
+      showErrorToast("Gagal mengikuti pengguna");
     }
   };
 
@@ -102,15 +153,26 @@ const UserFriends = ({ id, isOwner }) => {
       <Card>
         <CardContent className="p-6">
           <h2 className="text-xl font-semibold mb-4 dark:text-gray-300">
-            Friends
+            Teman
           </h2>
           <div className="flex justify-center items-center h-40">
-            <p className="text-gray-500">Loading friends...</p>
+            <p className="text-gray-500">Memuat daftar teman...</p>
           </div>
         </CardContent>
       </Card>
     );
   }
+
+  // Pagination logic
+  const indexOfLastFriend = currentPage * friendsPerPage;
+  const indexOfFirstFriend = indexOfLastFriend - friendsPerPage;
+  const currentFriends = following.slice(indexOfFirstFriend, indexOfLastFriend);
+  const totalPages = Math.ceil(following.length / friendsPerPage);
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
 
   return (
     <motion.div
@@ -123,7 +185,7 @@ const UserFriends = ({ id, isOwner }) => {
         <CardContent className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold dark:text-gray-300">
-              Friends ({following.length})
+              Teman ({following.length})
             </h2>
             {isOwner && (
               <Button
@@ -131,78 +193,135 @@ const UserFriends = ({ id, isOwner }) => {
                 size="sm"
                 onClick={() => router.push("/friends-list")}
               >
-                View Friend Suggestions
+                Lihat Saran Teman
               </Button>
             )}
           </div>
-          
+
           {following.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-gray-500 dark:text-gray-400">
-                {isOwner 
-                  ? "You don't have any friends yet. Go to Friend Suggestions to find people to follow." 
-                  : "This user doesn't have any friends yet."}
+                {isOwner
+                  ? "Anda belum memiliki teman. Kunjungi Saran Teman untuk menemukan orang yang dapat Anda ikuti."
+                  : "Pengguna ini belum memiliki teman."}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {following.map((friend) => (
-                <div
-                  key={friend._id}
-                  className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg flex items-start justify-between"
-                >
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {currentFriends.map((friend) => (
                   <div
-                    className="flex items-center space-x-4 cursor-pointer"
-                    onClick={() => handleUserClick(friend._id)}
+                    key={friend._id}
+                    className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg flex items-start justify-between"
                   >
-                    <Avatar>
-                      {friend.profilePicture ? (
-                        <AvatarImage
-                          src={friend.profilePicture || ""}
-                          alt={friend.username}
-                        />
-                      ) : (
-                        <AvatarFallback className="dark:bg-gray-400">
-                          {friend.username?.charAt(0) || "U"}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold dark:text-gray-100">
-                        {friend.username}
-                      </p>
-                      <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <span>{friend?.followerCount || 0} followers</span>
-                        <span>•</span>
-                        <span>{friend?.followingCount || 0} following</span>
+                    <div
+                      className="flex items-center space-x-4 cursor-pointer"
+                      onClick={() => handleUserClick(friend._id)}
+                    >
+                      <Avatar>
+                        {friend.profilePicture ? (
+                          <AvatarImage
+                            src={friend.profilePicture || ""}
+                            alt={friend.username}
+                          />
+                        ) : (
+                          <AvatarFallback className="dark:bg-gray-400">
+                            {friend.username?.charAt(0) || "U"}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold dark:text-gray-100">
+                          {friend.username}
+                        </p>
+                        <div className="flex items-center space-x-2 text-sm text-gray-400">
+                          <span>{friend?.followerCount || 0} pengikut</span>
+                          <span>•</span>
+                          <span>{friend?.followingCount || 0} mengikuti</span>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Only show action buttons if the user is not viewing their own profile */}
+                    {user && user._id !== friend._id && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4 text-gray-300" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isCurrentUserFollowing[friend._id] ? (
+                            <DropdownMenuItem
+                              onClick={() => handleUnfollow(friend._id)}
+                            >
+                              <UserX className="h-4 w-4 mr-2" /> Berhenti
+                              Mengikuti
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleFollow(friend._id)}
+                            >
+                              <UserPlus className="h-4 w-4 mr-2" /> Ikuti
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
-                  
-                  {/* Only show action buttons if the user is not viewing their own profile */}
-                  {user && user._id !== friend._id && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4 text-gray-300" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {isCurrentUserFollowing[friend._id] ? (
-                          <DropdownMenuItem onClick={() => handleUnfollow(friend._id)}>
-                            <UserX className="h-4 w-4 mr-2" /> Unfollow
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem onClick={() => handleFollow(friend._id)}>
-                            <UserPlus className="h-4 w-4 mr-2" /> Follow
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-6">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() =>
+                            handlePageChange(Math.max(1, currentPage - 1))
+                          }
+                          className={
+                            currentPage === 1
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                        (page) => (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(page)}
+                              isActive={currentPage === page}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      )}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() =>
+                            handlePageChange(
+                              Math.min(totalPages, currentPage + 1)
+                            )
+                          }
+                          className={
+                            currentPage === totalPages
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

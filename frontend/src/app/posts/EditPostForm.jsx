@@ -73,7 +73,7 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
 
       // Check if media has changed or if we're using the original media
       const isMediaChanged = mediaData && mediaData.url !== post?.mediaUrl;
-      
+
       // If media has changed or we're adding new media, use the direct upload endpoint
       if (isMediaChanged || (mediaData && !post?.mediaUrl)) {
         await fetch(`${config.backendUrl}/api/posts/${post._id}/direct`, {
@@ -89,15 +89,15 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
             mediaType: mediaData.type,
           }),
         })
-        .then(response => response.json())
-        .then(data => {
-          if (!data.success) {
-            throw new Error(data.message || "Failed to update post");
-          }
-          
-          // Update post in store
-          usePostStore.getState().updatePostInStore(data.data);
-        });
+          .then((response) => response.json())
+          .then((data) => {
+            if (!data.success) {
+              throw new Error(data.message || "Failed to update post");
+            }
+
+            // Update post in store
+            usePostStore.getState().updatePostInStore(data.data);
+          });
       } else {
         // Regular update without media changes
         await updatePost(post._id, {
@@ -231,6 +231,9 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
                 <X className="h-4 w-4" />
               </Button>
             </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+              Upload a photo (max 10MB) or video (max 100MB) for your post
+            </p>
             <CloudinaryUploader
               onUploadComplete={handleMediaUploadComplete}
               onUploadError={handleMediaUploadError}
@@ -258,11 +261,7 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
           </motion.div>
         )}
         <div className="flex justify-end mt-4">
-          <Button
-            variant="outline"
-            className="mr-2"
-            onClick={onClose}
-          >
+          <Button variant="outline" className="mr-2" onClick={onClose}>
             Cancel
           </Button>
           <Button

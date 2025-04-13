@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { X, AlertCircle, Plus } from "lucide-react";
 
@@ -22,7 +23,9 @@ import CloudinaryUploader from "../components/CloudinaryUploader";
 import config from "@/lib/config";
 
 const StoryForm = () => {
-  const { user } = userStore();
+  const router = useRouter();
+  // Gunakan getState() untuk selalu mendapatkan data user terbaru
+  const user = userStore((state) => state.user);
   const { createStory, loading, error } = useStoryStore();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -30,6 +33,20 @@ const StoryForm = () => {
   const [mediaData, setMediaData] = useState(null);
   const [storyError, setStoryError] = useState(null);
   const [showMediaUploader, setShowMediaUploader] = useState(true);
+
+  // Refresh user data when dialog is opened
+  const handleOpenChange = (open) => {
+    if (open) {
+      // Refresh user data from server
+      userStore
+        .getState()
+        .getCurrentUser()
+        .catch((err) => {
+          console.error("Error refreshing user data:", err);
+        });
+    }
+    setIsOpen(open);
+  };
 
   const handleMediaUploadComplete = (data) => {
     setMediaData(data);
@@ -89,7 +106,7 @@ const StoryForm = () => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <div className="relative cursor-pointer group">
           <div className="w-[110px] h-[200px] rounded-xl bg-gray-100 dark:bg-gray-800 flex flex-col items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-700">
@@ -98,9 +115,20 @@ const StoryForm = () => {
                 <Plus className="h-6 w-6 text-white" />
               </div>
               <p className="text-sm font-medium text-center">Create Story</p>
-              <div className="absolute bottom-4 w-8 h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-800">
+              <div
+                className="absolute bottom-4 w-8 h-8 rounded-full overflow-hidden border-2 border-white dark:border-gray-800 cursor-pointer hover:border-blue-500 transition-all duration-200"
+                onClick={(e) => {
+                  e.stopPropagation(); // Prevent opening the dialog
+                  if (user?._id) {
+                    router.push(`/user-profile/${user._id}`);
+                  }
+                }}
+              >
                 <Avatar className="h-full w-full">
-                  <AvatarImage src={user?.profilePicture || ""} />
+                  <AvatarImage
+                    key={`story-form-avatar-${user?._id}-${Date.now()}`}
+                    src={user?.profilePicture || ""}
+                  />
                   <AvatarFallback className="dark:bg-gray-600">
                     {user?.username?.charAt(0) || "U"}
                   </AvatarFallback>
@@ -127,7 +155,8 @@ const StoryForm = () => {
           {showMediaUploader && !mediaData && (
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                Upload a photo or video for your story (max 5MB)
+                Upload a photo or video for your story (max 5MB for both images
+                and videos)
               </p>
               <CloudinaryUploader
                 onUploadComplete={handleMediaUploadComplete}

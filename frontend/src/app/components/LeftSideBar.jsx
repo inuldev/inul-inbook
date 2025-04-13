@@ -23,7 +23,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const LeftSideBar = () => {
   const router = useRouter();
-  const { user, logout } = userStore();
+  // Gunakan selector untuk mendapatkan data user terbaru
+  const user = userStore((state) => state.user);
+  const logout = userStore((state) => state.logout);
   const { isSidebarOpen, toggleSidebar } = useSidebarStore();
   const { pendingRequestsCount, fetchPendingRequestsCount } =
     useFriendNotificationStore();
