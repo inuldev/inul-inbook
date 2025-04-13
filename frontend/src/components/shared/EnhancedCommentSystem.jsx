@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * EnhancedCommentSystem Component
+ * EnhancedCommentSystem Component (Optimistic UI)
  *
  * A comprehensive component for displaying and interacting with comments on posts.
  * Features include:
@@ -11,6 +11,13 @@
  * - Deleting comments
  * - Replying to comments
  * - Hierarchical display of comment replies
+ *
+ * Implementation details:
+ * - Uses optimistic UI updates for better user experience
+ * - Handles temporary comments while waiting for server response
+ * - Prevents duplicate comments from appearing
+ * - Disables interactions on temporary comments
+ * - Shows loading indicator for comments being sent
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -59,6 +66,9 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
   const [expandedReplies, setExpandedReplies] = useState({});
   const [commentLikes, setCommentLikes] = useState({});
   const [commentLikeCounts, setCommentLikeCounts] = useState({});
+  // State for forcing re-render when comments are updated
+  // This helps ensure temporary comments are properly replaced with real ones
+  const [, forceUpdate] = useState({});
 
   // State for show more/less comments
   const [visibleCommentCount, setVisibleCommentCount] = useState(3);
@@ -78,9 +88,59 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
     }
   }, []);
 
-  // Initialize comment likes state
+  // Initialize comment likes state and clean up temporary comments
   useEffect(() => {
     if (post?.comments?.length > 0) {
+      // Clean up any temporary comments if we have real ones
+      const tempComments = post.comments.filter((c) => c.isTemp);
+      if (tempComments.length > 0) {
+        // For each temp comment, check if we have a real one with the same text and user
+        tempComments.forEach((tempComment) => {
+          const hasRealComment = post.comments.some(
+            (c) =>
+              !c.isTemp &&
+              c.text === tempComment.text &&
+              c.user?._id === tempComment.user?._id
+          );
+
+          // If we have a real comment, remove the temp one
+          if (hasRealComment) {
+            post.comments = post.comments.filter(
+              (c) => c._id !== tempComment._id
+            );
+            // Force update to reflect changes
+            forceUpdate({});
+          }
+        });
+      }
+
+      // Also clean up temporary replies in comments
+      post.comments.forEach((comment) => {
+        if (comment.replies && comment.replies.length > 0) {
+          const tempReplies = comment.replies.filter((r) => r.isTemp);
+          if (tempReplies.length > 0) {
+            // For each temp reply, check if we have a real one with the same text and user
+            tempReplies.forEach((tempReply) => {
+              const hasRealReply = comment.replies.some(
+                (r) =>
+                  !r.isTemp &&
+                  r.text === tempReply.text &&
+                  r.user?._id === tempReply.user?._id
+              );
+
+              // If we have a real reply, remove the temp one
+              if (hasRealReply) {
+                comment.replies = comment.replies.filter(
+                  (r) => r._id !== tempReply._id
+                );
+                // Force update to reflect changes
+                forceUpdate({});
+              }
+            });
+          }
+        }
+      });
+
       const initialLikes = {};
       const initialLikeCounts = {};
 
@@ -121,9 +181,12 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       setCommentLikes(initialLikes);
       setCommentLikeCounts(initialLikeCounts);
     }
-  }, [post?.comments, user?._id]);
+  }, [post?.comments, user?._id, forceUpdate]);
 
   // Handle comment submission
+  // This function creates a temporary comment for immediate display
+  // and then sends the actual comment to the server in the background
+  // It also handles duplicate prevention and error handling
   const handleAddComment = () => {
     if (!commentText.trim()) return;
 
@@ -167,11 +230,36 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
       (newComment) => {
         // Replace temporary comment with real one if needed
         if (post.comments) {
+          // Find and remove any duplicates of this comment (by text and user)
+          const duplicates = post.comments.filter(
+            (c) =>
+              c._id !== tempId && // Not our temp comment
+              c.text === commentToSend && // Same text
+              c.user?._id === user?._id && // Same user
+              !c.isTemp // Not another temp comment
+          );
+
+          // Remove duplicates
+          if (duplicates.length > 0) {
+            post.comments = post.comments.filter(
+              (comment) => !duplicates.some((dup) => dup._id === comment._id)
+            );
+          }
+
+          // Replace our temp comment with the real one
           const index = post.comments.findIndex(
             (c) => c.isTemp && c._id === tempId
           );
           if (index !== -1 && newComment) {
-            post.comments[index] = { ...newComment, isTemp: false };
+            // Completely replace the temporary comment with the real one
+            // Make sure not to include isTemp property at all
+            post.comments[index] = newComment;
+
+            // Force a re-render by creating a new array
+            post.comments = [...post.comments];
+
+            // Force component re-render
+            forceUpdate({});
           }
         }
       }
@@ -548,15 +636,52 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
     }));
 
     // Call the API in the background
-    replyToComment(commentId, post._id, replyToSend).catch((error) => {
-      console.error("Error replying to comment:", error);
-      // Remove temporary reply on error
-      const parentComment = post.comments.find((c) => c._id === commentId);
-      if (parentComment && parentComment.replies) {
-        parentComment.replies = parentComment.replies.filter((r) => !r.isTemp);
-        parentComment.replyCount = parentComment.replies.length;
-      }
-    });
+    replyToComment(commentId, post._id, replyToSend)
+      .then((newReply) => {
+        // If we got a reply from the server, replace the temporary one
+        if (newReply && parentComment.replies) {
+          // Find and remove any duplicates of this reply (by text and user)
+          const duplicates = parentComment.replies.filter(
+            (r) =>
+              r._id !== tempReplyId && // Not our temp reply
+              r.text === replyToSend && // Same text
+              r.user?._id === user?._id && // Same user
+              !r.isTemp // Not another temp reply
+          );
+
+          // Remove duplicates
+          if (duplicates.length > 0) {
+            parentComment.replies = parentComment.replies.filter(
+              (reply) => !duplicates.some((dup) => dup._id === reply._id)
+            );
+          }
+
+          // Replace our temp reply with the real one
+          const index = parentComment.replies.findIndex(
+            (r) => r.isTemp && r._id === tempReplyId
+          );
+          if (index !== -1) {
+            // Completely replace the temporary reply with the real one
+            parentComment.replies[index] = newReply;
+
+            // Force a re-render
+            parentComment.replies = [...parentComment.replies];
+            forceUpdate({});
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error replying to comment:", error);
+        // Remove temporary reply on error
+        const parentComment = post.comments.find((c) => c._id === commentId);
+        if (parentComment && parentComment.replies) {
+          parentComment.replies = parentComment.replies.filter(
+            (r) => !r.isTemp
+          );
+          parentComment.replyCount = parentComment.replies.length;
+          forceUpdate({});
+        }
+      });
   };
 
   // Handle cancel reply
@@ -605,7 +730,13 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
 
   // Toggle show all comments
   const toggleShowAllComments = () => {
-    setShowAllComments((prev) => !prev);
+    const newShowAllState = !showAllComments;
+    setShowAllComments(newShowAllState);
+
+    // If we're hiding comments, reset the visible count to default
+    if (!newShowAllState) {
+      setVisibleCommentCount(3);
+    }
   };
 
   // Render a single comment
@@ -643,7 +774,8 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
 
                   {/* Edit/Delete dropdown for own comments */}
                   {user?._id === comment?.user?._id &&
-                    editingComment !== comment._id && (
+                    editingComment !== comment._id &&
+                    !comment.isTemp && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -712,7 +844,14 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm">{comment.text}</p>
+                  <p className="text-sm">
+                    {comment.text}
+                    {comment.isTemp && (
+                      <span className="text-xs text-gray-400 ml-2">
+                        (Mengirim...)
+                      </span>
+                    )}
+                  </p>
                 )}
               </div>
             </div>
@@ -728,15 +867,16 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
               size="sm"
               className={`h-6 px-2 ${
                 isLiked ? "text-blue-500 dark:text-blue-400" : ""
-              }`}
-              onClick={() => handleLikeComment(comment._id)}
+              } ${comment.isTemp ? "opacity-50 cursor-not-allowed" : ""}`}
+              onClick={() => !comment.isTemp && handleLikeComment(comment._id)}
+              disabled={comment.isTemp}
             >
               <ThumbsUp className="h-3 w-3 mr-1" />
               {likeCount > 0 && <span>{likeCount}</span>}
             </Button>
 
             {/* Reply button - only show for top-level comments */}
-            {!isReply && (
+            {!isReply && !comment.isTemp && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -823,7 +963,11 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
             <div className="mt-2">
               {/* Show limited replies with show more/less */}
               {comment.replies
-                .filter((reply) => reply._id) // Only include replies with valid IDs
+                .filter(
+                  (reply) =>
+                    reply._id && // Must have valid ID
+                    (!reply.isTemp || reply._id.startsWith("temp-reply-")) // Either not temporary or our own temp reply
+                )
                 .slice(0, visibleRepliesCount[comment._id] || 3) // Limit visible replies
                 .map((reply) => (
                   <div key={reply._id || `fallback-reply-${Math.random()}`}>
@@ -832,8 +976,11 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
                 ))}
 
               {/* Show more/less replies buttons */}
-              {comment.replies.filter((reply) => reply._id).length >
-                (visibleRepliesCount[comment._id] || 3) && (
+              {comment.replies.filter(
+                (reply) =>
+                  reply._id && // Must have valid ID
+                  (!reply.isTemp || reply._id.startsWith("temp-reply-")) // Either not temporary or our own temp reply
+              ).length > (visibleRepliesCount[comment._id] || 3) && (
                 <div className="flex justify-end mt-1">
                   <button
                     onClick={() => showMoreReplies(comment._id)}
@@ -845,7 +992,11 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
               )}
 
               {(visibleRepliesCount[comment._id] || 3) > 3 &&
-                comment.replies.filter((reply) => reply._id).length > 3 && (
+                comment.replies.filter(
+                  (reply) =>
+                    reply._id && // Must have valid ID
+                    (!reply.isTemp || reply._id.startsWith("temp-reply-")) // Either not temporary or our own temp reply
+                ).length > 3 && (
                   <div className="flex justify-end mt-1">
                     <button
                       onClick={() => showLessReplies(comment._id)}
@@ -902,8 +1053,20 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
         {post?.comments && post.comments.length > 0 ? (
           <div className="space-y-4">
             {/* Filter and limit top-level comments */}
+            {/*
+              Filter conditions:
+              1. Only show top-level comments (not replies)
+              2. Only show comments with valid IDs
+              3. For temporary comments, only show our own temp comments (with temp- prefix)
+                 This prevents duplicate comments from appearing
+            */}
             {post.comments
-              .filter((comment) => !comment.parentComment && comment._id) // Only show top-level comments with valid IDs
+              .filter(
+                (comment) =>
+                  !comment.parentComment && // Only top-level comments
+                  comment._id && // Must have valid ID
+                  (!comment.isTemp || comment._id.startsWith("temp-")) // Either not temporary or our own temp comment
+              )
               .slice(0, showAllComments ? undefined : visibleCommentCount) // Limit visible comments
               .map((comment) => (
                 <div key={comment._id || `fallback-${Math.random()}`}>
@@ -913,7 +1076,10 @@ const EnhancedCommentSystem = ({ post, onCommentAdded }) => {
 
             {/* Show more/less comments button */}
             {post.comments.filter(
-              (comment) => !comment.parentComment && comment._id
+              (comment) =>
+                !comment.parentComment &&
+                comment._id &&
+                (!comment.isTemp || comment._id.startsWith("temp-"))
             ).length > visibleCommentCount && (
               <div className="flex justify-center mt-2">
                 <button

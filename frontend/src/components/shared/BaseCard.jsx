@@ -509,8 +509,8 @@ const BaseCard = ({
                         `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
                           postUrl
                         )}`,
-                        "_blank",
-                        "width=600,height=400"
+                        "_blank"
+                        // "width=600,height=400"
                       );
                       // Update share count in backend
                       handleShare("facebook");
@@ -531,8 +531,8 @@ const BaseCard = ({
                         `https://twitter.com/intent/tweet?url=${encodeURIComponent(
                           postUrl
                         )}&text=${encodeURIComponent(text)}`,
-                        "_blank",
-                        "width=600,height=400"
+                        "_blank"
+                        // "width=600,height=400"
                       );
                       // Update share count in backend
                       handleShare("twitter");
@@ -550,8 +550,8 @@ const BaseCard = ({
                         `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
                           postUrl
                         )}`,
-                        "_blank",
-                        "width=600,height=400"
+                        "_blank"
+                        // "width=600,height=400"
                       );
                       // Update share count in backend
                       handleShare("linkedin");

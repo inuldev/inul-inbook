@@ -315,7 +315,7 @@ export const updateComment = async (
  * @param {string} postId - The post ID
  * @param {string} replyText - The reply text
  * @param {Function} onReplyAdded - Callback function after reply is added
- * @returns {Promise<void>}
+ * @returns {Promise<Object>} - The new reply object
  */
 export const replyToComment = async (
   commentId,
@@ -393,8 +393,12 @@ export const replyToComment = async (
 
     // Show success message
     showSuccessToast("Reply added");
+
+    // Return the new reply object
+    return newReply;
   } catch (error) {
     console.error("Error replying to comment:", error);
     showErrorToast("Failed to reply to comment");
+    return null;
   }
 };
