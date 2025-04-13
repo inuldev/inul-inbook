@@ -1,9 +1,9 @@
 /**
  * Comment Interaction Helpers
- * 
- * This module provides helper functions for comment interactions (like, reply, delete)
+ *
+ * This module provides helper functions for comment interactions (like, reply, update, delete)
  * that can be used across different components.
- * 
+ *
  * These functions are designed to:
  * 1. Provide a consistent interface for comment interactions
  * 2. Handle optimistic updates for better UX
@@ -12,9 +12,9 @@
  */
 
 import config from "@/lib/config";
-import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
-import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
+import usePostStore from "@/store/postStore";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 /**
  * Toggle like status for a comment
@@ -83,15 +83,11 @@ export const toggleCommentLike = async (
  * @param {Function} onCommentDeleted - Callback function after comment is deleted
  * @returns {Promise<void>}
  */
-export const deleteComment = async (
-  commentId,
-  postId,
-  onCommentDeleted
-) => {
+export const deleteComment = async (commentId, postId, onCommentDeleted) => {
   try {
     // Get the current user from userStore
     const { user: currentUser } = userStore.getState();
-    
+
     // Check if user is logged in
     if (!currentUser || !currentUser._id) {
       showErrorToast("Please log in to delete comments");
@@ -131,6 +127,74 @@ export const deleteComment = async (
   } catch (error) {
     console.error("Error deleting comment:", error);
     showErrorToast("Failed to delete comment");
+  }
+};
+
+/**
+ * Update a comment
+ * @param {string} commentId - The comment ID
+ * @param {string} postId - The post ID
+ * @param {string} commentText - The updated comment text
+ * @param {Function} onCommentUpdated - Callback function after comment is updated
+ * @returns {Promise<void>}
+ */
+export const updateComment = async (
+  commentId,
+  postId,
+  commentText,
+  onCommentUpdated
+) => {
+  try {
+    // Get current user
+    const { user } = userStore.getState();
+    if (!user || !user._id) {
+      showErrorToast("Please log in to update comments");
+      return;
+    }
+
+    // Check if comment text is empty
+    if (!commentText.trim()) {
+      showErrorToast("Comment text cannot be empty");
+      return;
+    }
+
+    // Make the API call
+    const response = await fetch(
+      `${config.backendUrl}/api/posts/comments/${commentId}`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: commentText.trim() }),
+        timeout: config.apiTimeouts.medium,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.message || "Failed to update comment");
+    }
+
+    // Get the updated comment from the server
+    const updatedComment = data.data;
+
+    // Fetch the updated post to get the latest comments
+    const postStore = usePostStore.getState();
+    await postStore.fetchPost(postId);
+
+    // Call the callback function with the updated comment
+    if (onCommentUpdated) {
+      onCommentUpdated(updatedComment);
+    }
+
+    // Show success message
+    showSuccessToast("Comment updated");
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    showErrorToast("Failed to update comment");
   }
 };
 

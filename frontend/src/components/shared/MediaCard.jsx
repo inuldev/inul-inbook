@@ -2,14 +2,13 @@
 
 /**
  * MediaCard Component
- * 
+ *
  * A component for displaying media posts (images, videos) in the feed.
  * This component extends BaseCard with specific functionality for media posts.
  */
 
 import React from "react";
 import BaseCard from "./BaseCard";
-import MediaComments from "./MediaComments";
 
 /**
  * MediaCard Component
@@ -30,17 +29,15 @@ const MediaCard = ({
   onDelete = null,
   onEdit = null,
 }) => {
-  // Render MediaComments component for comments
-  const commentsComponent = <MediaComments comments={post?.comments} postId={post?._id} />;
+  // No need to pass commentsComponent anymore as BaseCard now uses EnhancedCommentSystem directly
 
-  // Render BaseCard with MediaComments
+  // Render BaseCard
   return (
     <BaseCard
       post={post}
       isVideoFeed={isVideoFeed}
       customHandlers={customHandlers}
       initialLiked={initialLiked}
-      commentsComponent={commentsComponent}
       onDelete={onDelete}
       onEdit={onEdit}
     />

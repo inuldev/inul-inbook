@@ -189,27 +189,11 @@ const getFeedPosts = async (req, res) => {
 // @access  Public
 const getPost = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id)
-      .populate({
-        path: "user",
-        select: "username profilePicture",
-      })
-      .populate({
-        path: "comments",
-        populate: [
-          {
-            path: "user",
-            select: "username profilePicture",
-          },
-          {
-            path: "replies",
-            populate: {
-              path: "user",
-              select: "username profilePicture",
-            },
-          },
-        ],
-      });
+    // First, find the post
+    const post = await Post.findById(req.params.id).populate({
+      path: "user",
+      select: "username profilePicture",
+    });
 
     if (!post) {
       return res.status(404).json({
@@ -217,6 +201,27 @@ const getPost = async (req, res) => {
         message: "Post not found",
       });
     }
+
+    // Then, find all comments for this post
+    const comments = await Comment.find({
+      post: req.params.id,
+      parentComment: null, // Only top-level comments
+    })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "user",
+        select: "username profilePicture",
+      })
+      .populate({
+        path: "replies",
+        populate: {
+          path: "user",
+          select: "username profilePicture",
+        },
+      });
+
+    // Add comments to the post object
+    post.comments = comments;
 
     // Check if post is private and user is not the owner
     if (
@@ -737,6 +742,65 @@ const deleteComment = async (req, res) => {
   }
 };
 
+// @desc    Update a comment
+// @route   PUT /api/posts/comments/:id
+// @access  Private
+const updateComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    // Check if text is provided
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        message: "Comment text is required",
+      });
+    }
+
+    // Find comment
+    const comment = await Comment.findById(req.params.id);
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: "Comment not found",
+      });
+    }
+
+    // Check if user is the owner
+    if (comment.user.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this comment",
+      });
+    }
+
+    // Update comment
+    comment.text = text;
+
+    // Save comment
+    await comment.save();
+
+    // Populate user data
+    const populatedComment = await Comment.findById(comment._id).populate({
+      path: "user",
+      select: "username profilePicture",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Comment updated successfully",
+      data: populatedComment,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Like a comment
 // @route   PUT /api/posts/comments/:id/like
 // @access  Private
@@ -1071,6 +1135,7 @@ module.exports = {
   getPostComments,
   replyToComment,
   deleteComment,
+  updateComment,
   likeComment,
   unlikeComment,
   sharePost,

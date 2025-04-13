@@ -8,7 +8,7 @@ import {
 } from "@/lib/cookieUtils";
 import { storeToken, storeUserData, clearAuthData } from "@/lib/authUtils";
 
-const userStore = create((set) => ({
+const userStore = create((set, get) => ({
   user: null,
   isAuthenticated: false,
   loading: true,
@@ -640,6 +640,19 @@ const userStore = create((set) => ({
   },
 
   clearErrors: () => set({ error: null }),
+
+  // Debug function to check user state
+  checkUser: () => {
+    const state = get();
+    console.log("Current user state:", {
+      user: state.user,
+      isAuthenticated: state.isAuthenticated,
+      loading: state.loading,
+      error: state.error,
+      token: state.token ? "[TOKEN EXISTS]" : null,
+    });
+    return state.user;
+  },
 }));
 
 export default userStore;

@@ -128,8 +128,10 @@ const usePostStore = create((set, get) => ({
    * @returns {Promise<Object>} - Post object
    */
   fetchPost: async (postId) => {
+    console.log("fetchPost called with postId:", postId);
     set({ loading: true, error: null });
     try {
+      console.log("Making API request to fetch post");
       const response = await fetch(`${config.backendUrl}/api/posts/${postId}`, {
         method: "GET",
         credentials: "include",
@@ -139,24 +141,33 @@ const usePostStore = create((set, get) => ({
         timeout: config.apiTimeouts.medium,
       });
 
+      console.log("API response received");
       const data = await response.json();
+      console.log("API response data:", data);
 
       if (!data.success) {
+        console.error("API returned error:", data.message);
         throw new Error(data.message || "Failed to fetch post");
       }
 
       // Process post to ensure consistent format
       const currentUser = userStore.getState().user;
+      console.log("Processing post data with current user:", currentUser?._id);
       const processedPost = get().processPost(data.data, currentUser);
+      console.log("Processed post:", processedPost);
 
       // Update the post in the store if it exists
-      set((state) => ({
-        posts: state.posts.map((post) =>
-          post._id === postId ? processedPost : post
-        ),
-        loading: false,
-      }));
+      set((state) => {
+        console.log("Updating post in store");
+        return {
+          posts: state.posts.map((post) =>
+            post._id === postId ? processedPost : post
+          ),
+          loading: false,
+        };
+      });
 
+      console.log("Returning processed post");
       return processedPost;
     } catch (error) {
       console.error(`Error fetching post ${postId}:`, error);
@@ -788,11 +799,15 @@ const usePostStore = create((set, get) => ({
    * @returns {Object} - Processed post
    */
   processPost: (post, currentUser) => {
+    console.log("processPost called with post:", post?._id);
+
     // Ensure likes is always an array
     const likes = Array.isArray(post.likes) ? post.likes : [];
+    console.log("Likes array:", likes);
 
     // Ensure comments is always an array
     const comments = Array.isArray(post.comments) ? post.comments : [];
+    console.log("Comments array length:", comments.length);
 
     // Check if the current user has liked this post
     let isLiked = false;
@@ -812,6 +827,8 @@ const usePostStore = create((set, get) => ({
         currentUser: currentUser._id,
         likes,
       });
+    } else {
+      console.log("No current user available for like check");
     }
 
     // Ensure counts match the arrays length
@@ -819,7 +836,9 @@ const usePostStore = create((set, get) => ({
     const commentCount = Math.max(post.commentCount || 0, comments.length);
     const shareCount = post.shareCount || 0;
 
-    return {
+    console.log("Processed counts:", { likeCount, commentCount, shareCount });
+
+    const processedPost = {
       ...post,
       likes,
       comments,
@@ -828,6 +847,12 @@ const usePostStore = create((set, get) => ({
       shareCount,
       isLiked: !!isLiked,
     };
+
+    console.log(
+      "Returning processed post with comments length:",
+      processedPost.comments.length
+    );
+    return processedPost;
   },
 
   /**

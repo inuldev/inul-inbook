@@ -14,6 +14,7 @@ const {
   getPostComments,
   replyToComment,
   deleteComment,
+  updateComment,
   likeComment,
   unlikeComment,
   sharePost,
@@ -87,6 +88,7 @@ router.put("/:id/share", protect, sharePost);
 router.post("/:id/comment", protect, commentOnPost);
 router.post("/comments/:id/reply", protect, replyToComment);
 router.delete("/comments/:id", protect, deleteComment);
+router.put("/comments/:id", protect, updateComment);
 router.put("/comments/:id/like", protect, likeComment);
 router.put("/comments/:id/unlike", protect, unlikeComment);
 

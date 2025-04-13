@@ -16,23 +16,20 @@
 
 // import { format } from "date-fns";
 import Image from "next/image";
-import { AnimatePresence, motion } from "framer-motion";
-import React, { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import {
   Clock,
   MessageCircle,
   Share2,
   ThumbsUp,
-  Send,
   MoreHorizontal,
   Trash2,
   Edit,
 } from "lucide-react";
 
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -52,10 +49,11 @@ import {
 import { formatDate } from "@/lib/utils";
 import userStore from "@/store/userStore";
 import usePostStore from "@/store/postStore";
+import useCommentStore from "@/store/commentStore";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import EnhancedCommentSystem from "./EnhancedCommentSystem";
 import {
   togglePostLike,
-  addPostComment,
   sharePost,
   generateSharedLink,
 } from "@/lib/postInteractionHelpers";
@@ -67,7 +65,7 @@ import {
  * @param {boolean} props.isVideoFeed - Whether this card is in video feed
  * @param {Object} props.customHandlers - Custom handlers for interactions
  * @param {boolean} props.initialLiked - Initial like state
- * @param {React.ReactNode} props.commentsComponent - Custom comments component
+ * @removed props.commentsComponent - Custom comments component (replaced with EnhancedCommentSystem)
  * @param {Function} props.onDelete - Callback when post is deleted
  * @param {Function} props.onEdit - Callback when post is edited
  * @returns {React.ReactElement}
@@ -78,28 +76,31 @@ const BaseCard = ({
   isVideoFeed = false,
   customHandlers = null,
   initialLiked = undefined,
-  commentsComponent = null,
+
   onDelete = null,
   onEdit = null,
 }) => {
   // Get user from store
-  const { user } = userStore();
-  const { deletePost } = usePostStore();
+  const userState = userStore();
+  const { user } = userState;
+
+  // Get comment store
+  const commentStore = useCommentStore();
+  const { activeCommentPostId, showComments: showCommentsGlobal } =
+    commentStore;
+  const isActiveCommentPost = activeCommentPostId === post?._id;
+
+  // Get post store for post operations
+  usePostStore();
 
   // Local state
-  const [showComments, setShowComments] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(post?.likeCount || 0);
   const [commentCount, setCommentCount] = useState(post?.commentCount || 0);
   const [shareCount, setShareCount] = useState(post?.shareCount || 0);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Refs
-  const commentInputRef = useRef(null);
 
   // Check if the current user is the owner of the post
   const isOwner = user?._id === post?.user?._id;
@@ -126,7 +127,6 @@ const BaseCard = ({
     } else if (post.isLiked !== undefined) {
       // If the post has an isLiked property (from the store), use it
       setIsLiked(post.isLiked);
-      console.log(`Post ${post._id} using isLiked property:`, post.isLiked);
     } else if (Array.isArray(post.likes)) {
       // Check if the current user has liked this post
       const userLiked = post.likes.some((like) => {
@@ -147,16 +147,9 @@ const BaseCard = ({
         ...post,
         isLiked: userLiked,
       });
-
-      // Log for debugging
-      console.log(`Post ${post._id} like state initialized from likes array:`, {
-        userLiked,
-        likes: post.likes,
-      });
     } else {
       // Default to not liked if no likes array exists
       setIsLiked(false);
-      console.log(`Post ${post._id} defaulting to not liked`);
     }
   }, [post, user, initialLiked]);
 
@@ -190,12 +183,6 @@ const BaseCard = ({
       return;
     }
 
-    // If comments are already shown, just hide them
-    if (showComments) {
-      setShowComments(false);
-      return;
-    }
-
     // If comments are not loaded yet, fetch them
     if (!post.comments || post.comments.length === 0) {
       try {
@@ -207,9 +194,9 @@ const BaseCard = ({
 
         // Update comment count
         if (processedPost.comments) {
-          setCommentCount(
-            processedPost.comments.length || processedPost.commentCount || 0
-          );
+          const newCommentCount =
+            processedPost.comments.length || processedPost.commentCount || 0;
+          setCommentCount(newCommentCount);
         }
       } catch (error) {
         console.error("Error fetching post comments:", error);
@@ -219,33 +206,8 @@ const BaseCard = ({
       }
     }
 
-    // Show comments
-    setShowComments(true);
-  };
-
-  /**
-   * Handle comment submission
-   */
-  const handleAddComment = async () => {
-    // If custom handler is provided, use it
-    if (customHandlers?.handleAddComment) {
-      customHandlers.handleAddComment(commentText);
-      setCommentText("");
-      return;
-    }
-
-    // Use the standardized helper function
-    await addPostComment(
-      post._id,
-      commentText,
-      setCommentText,
-      setCommentCount,
-      setIsSubmitting,
-      (newComment) => {
-        // Make sure comments are visible after adding a comment
-        setShowComments(true);
-      }
-    );
+    // Toggle comments using the global store
+    commentStore.toggleComments(post._id);
   };
 
   /**
@@ -313,8 +275,7 @@ const BaseCard = ({
       return;
     }
 
-    // Open edit form
-    setIsEditFormOpen(true);
+    // Call the callback to open edit form
 
     // Call the callback if provided
     if (onEdit) {
@@ -561,9 +522,6 @@ const BaseCard = ({
                     onClick={() => {
                       // Generate post URL
                       const postUrl = generateSharedLink(post._id);
-                      const title = post.text
-                        ? post.text.substring(0, 100)
-                        : "Check out this post";
                       // Open LinkedIn share dialog
                       window.open(
                         `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
@@ -606,60 +564,14 @@ const BaseCard = ({
           </div>
 
           {/* Comments section */}
-          <AnimatePresence>
-            {showComments && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                {/* Comment input */}
-                <div className="flex items-center mt-4 mb-4">
-                  <Avatar className="h-8 w-8 mr-2">
-                    <AvatarImage src={user?.profilePicture} />
-                    <AvatarFallback className="dark:bg-gray-400">
-                      {user?.username?.substring(0, 2).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 flex">
-                    <Input
-                      ref={commentInputRef}
-                      className="flex-1 mr-2 dark:border-gray-400"
-                      placeholder="Write a comment..."
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      disabled={isSubmitting}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleAddComment();
-                        }
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleAddComment}
-                      disabled={!commentText.trim() || isSubmitting}
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Comments list */}
-                <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-                  {commentsComponent ? (
-                    commentsComponent
-                  ) : (
-                    <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-                      No comments yet. Be the first to comment!
-                    </div>
-                  )}
-                </ScrollArea>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {showCommentsGlobal && isActiveCommentPost && user && (
+            <EnhancedCommentSystem
+              post={post}
+              onCommentAdded={(newCount) => {
+                setCommentCount(newCount);
+              }}
+            />
+          )}
         </CardContent>
       </Card>
     </motion.div>
