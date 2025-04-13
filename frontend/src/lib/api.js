@@ -33,8 +33,24 @@ export async function apiRequest(
 
   // Set default headers if not provided
   const headers = options.headers || {};
-  if (!headers["Content-Type"] && !options.body instanceof FormData) {
+
+  // Check if body is FormData - note the correct instanceof check
+  const isFormData = options.body instanceof FormData;
+
+  // Only set Content-Type for non-FormData requests
+  // For FormData, browser will automatically set the correct Content-Type with boundary
+  if (!headers["Content-Type"] && !isFormData) {
     headers["Content-Type"] = "application/json";
+  }
+
+  // Log for debugging
+  if (config.isDevelopment) {
+    console.log(
+      `Request body type: ${isFormData ? "FormData" : typeof options.body}`
+    );
+    if (isFormData && options.body) {
+      console.log("FormData contains:", Array.from(options.body.entries()));
+    }
   }
 
   // Set timeout based on request type

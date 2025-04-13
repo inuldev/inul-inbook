@@ -74,3 +74,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Styling khusus untuk dialog foto */
+.photo-dialog .max-w-\[90vw\] {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Styling untuk gambar dalam dialog */
+.photo-dialog img {
+  transition: transform 0.3s ease-in-out;
+}
+
+.photo-dialog img:hover {
+  transform: scale(1.02);
+}

@@ -1,4 +1,4 @@
-import Image from "next/image";
+// import Image from "next/image";
 import { motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 import {
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { formatDateInDDMMYYY, formatTanggal, formatDate } from "@/lib/utils";
+import { formatTanggal, formatDate } from "@/lib/utils";
 import { usePostStore } from "@/store/usePostStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
@@ -24,7 +24,6 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -33,7 +32,7 @@ import {
 
 import EditBio from "./profileContent/EditBio";
 import PostsContent from "./profileContent/PostsContent";
-import MutualFriends from "./profileContent/MutualFriends";
+// import MutualFriends from "./profileContent/MutualFriends";
 import UserFriends from "./profileContent/UserFriends";
 
 const ProfileDetails = ({
@@ -119,12 +118,12 @@ const ProfileDetails = ({
                 Intro
               </h2>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
-                {profileData?.bio?.bioText}
+                {profileData?.bio?.about}
               </p>
               <div className="space-y-2 mb-4 dark:text-gray-300">
                 <div className="flex items-center">
                   <Home className="w-5 h-5 mr-2" />
-                  <span> {profileData?.bio?.liveIn}</span>
+                  <span> {profileData?.bio?.location?.city}</span>
                 </div>
                 <div className="flex items-center">
                   <Heart className="w-5 h-5 mr-2" />
@@ -132,15 +131,31 @@ const ProfileDetails = ({
                 </div>
                 <div className="flex items-center">
                   <MapPin className="w-5 h-5 mr-2" />
-                  <span>{profileData?.bio?.hometown}</span>
+                  <span>{profileData?.bio?.location?.country}</span>
                 </div>
                 <div className="flex items-center">
                   <Briefcase className="w-5 h-5 mr-2" />
-                  <span> {profileData?.bio?.workplace}</span>
+                  <span>
+                    {profileData?.bio?.work && profileData.bio.work[0]
+                      ? `${profileData.bio.work[0].company || ""} ${
+                          profileData.bio.work[0].position
+                            ? "- " + profileData.bio.work[0].position
+                            : ""
+                        }`.trim()
+                      : ""}
+                  </span>
                 </div>
                 <div className="flex items-center">
                   <GraduationCap className="w-5 h-5 mr-2" />
-                  <span> {profileData?.bio?.education}</span>
+                  <span>
+                    {profileData?.bio?.education && profileData.bio.education[0]
+                      ? `${profileData.bio.education[0].school || ""} ${
+                          profileData.bio.education[0].degree
+                            ? "- " + profileData.bio.education[0].degree
+                            : ""
+                        }`.trim()
+                      : ""}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center mb-4 dark:text-gray-300">
@@ -261,10 +276,10 @@ const ProfileDetails = ({
                     </div>
                   )}
 
-                {profileData?.bio?.hometown && (
+                {profileData?.bio?.location?.country && (
                   <div className="flex items-center">
                     <MapPin className="w-5 h-5 mr-3" />
-                    <span>Berasal dari {profileData.bio.hometown}</span>
+                    <span>Berasal dari {profileData.bio.location.country}</span>
                   </div>
                 )}
 
@@ -388,14 +403,14 @@ const ProfileDetails = ({
                         onClick={() => setSelectedPhoto(post)}
                       >
                         {post?.mediaUrl ? (
-                          <Image
-                            src={post.mediaUrl}
-                            alt={post.content || "Foto pengguna"}
-                            fill
-                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
-                            className="object-cover"
-                            loading="lazy"
-                          />
+                          <div className="relative w-full h-full">
+                            <img
+                              src={post.mediaUrl}
+                              alt={post.content || "Foto pengguna"}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
                         ) : (
                           <div className="w-full h-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
                             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -466,9 +481,12 @@ const ProfileDetails = ({
           {selectedPhoto && (
             <Dialog
               open={!!selectedPhoto}
-              onOpenChange={() => setSelectedPhoto(null)}
+              onOpenChange={(open) => {
+                if (!open) setSelectedPhoto(null);
+              }}
+              className="photo-dialog" /* Tambahkan class untuk styling khusus */
             >
-              <DialogContent className="max-w-4xl p-0 overflow-hidden bg-transparent border-none">
+              <DialogContent className="max-w-[90vw] md:max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-xl">
                 <div className="relative">
                   <Button
                     variant="ghost"
@@ -479,24 +497,52 @@ const ProfileDetails = ({
                     <X className="h-5 w-5" />
                   </Button>
 
-                  <div className="relative max-h-[80vh] flex items-center justify-center bg-black bg-opacity-90 p-2">
-                    <Image
+                  <div className="relative max-h-[80vh] flex items-center justify-center bg-black bg-opacity-90 p-2 rounded-t-md">
+                    {/* Tambahkan loading indicator */}
+                    <div className="absolute inset-0 flex items-center justify-center z-0">
+                      <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                    </div>
+                    {/* Gunakan img tag biasa untuk menghindari masalah dengan Next.js Image */}
+                    <img
                       src={selectedPhoto.mediaUrl}
                       alt={selectedPhoto.content || "Foto pengguna"}
-                      width={1200}
-                      height={800}
-                      className="max-h-[80vh] w-auto object-contain"
+                      className="max-h-[70vh] max-w-full object-contain rounded-md z-10 relative"
+                      style={{
+                        display: "block",
+                      }} /* Pastikan gambar ditampilkan sebagai block */
+                      onLoad={(e) => {
+                        // Sembunyikan loading indicator ketika gambar berhasil dimuat
+                        const loadingIndicator =
+                          e.target.parentNode.querySelector("div.absolute");
+                        if (loadingIndicator)
+                          loadingIndicator.style.display = "none";
+                      }}
+                      onError={(e) => {
+                        console.error("Error loading image:", e);
+                        // Gunakan data URI untuk placeholder image
+                        e.target.src =
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23f0f0f0'/%3E%3Ctext x='400' y='300' font-family='Arial' font-size='24' text-anchor='middle' fill='%23999999'%3EGambar Tidak Tersedia%3C/text%3E%3C/svg%3E";
+                        e.target.onerror = null; // Prevent infinite loop
+                      }}
                     />
                   </div>
 
                   {selectedPhoto.content && (
-                    <div className="p-4 bg-white dark:bg-gray-800">
-                      <p className="text-gray-800 dark:text-gray-200">
+                    <div className="p-4 bg-white dark:bg-gray-800 rounded-b-md">
+                      <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
                         {selectedPhoto.content}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                        {formatDate(selectedPhoto.createdAt)}
-                      </p>
+                      <div className="flex justify-between items-center mt-2">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {formatDate(selectedPhoto.createdAt)}
+                        </p>
+                        {selectedPhoto.user && (
+                          <p className="text-sm text-blue-500 dark:text-blue-400">
+                            Diunggah oleh:{" "}
+                            {selectedPhoto.user.username || "Pengguna"}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -510,13 +556,15 @@ const ProfileDetails = ({
   return (
     <div>
       {tabContent[activeTab] || null}
-      <EditBio
-        isOpen={isEditBioModel}
-        onClose={() => setIsEditBioModel(false)}
-        fetchProfile={fetchProfile}
-        initialData={profileData?.bio}
-        id={id}
-      ></EditBio>
+      {profileData && (
+        <EditBio
+          isOpen={isEditBioModel}
+          onClose={() => setIsEditBioModel(false)}
+          fetchProfile={fetchProfile}
+          initialData={profileData?.bio || {}}
+          id={id}
+        />
+      )}
     </div>
   );
 };

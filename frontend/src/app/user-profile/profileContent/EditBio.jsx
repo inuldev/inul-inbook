@@ -15,13 +15,6 @@ import { Save } from "lucide-react";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const EditBio = ({ isOpen, onClose, initialData, id, fetchProfile }) => {
   const {
@@ -34,48 +27,85 @@ const EditBio = ({ isOpen, onClose, initialData, id, fetchProfile }) => {
   });
   // Reset form when initialData changes
   useEffect(() => {
-    if (initialData) {
-      reset({
-        about: initialData.about || "",
-        relationship: initialData.relationship || "",
-        phone: initialData.phone || "",
-        website: initialData.website || "",
-        // Simplified fields for location
-        city: initialData.location?.city || "",
-        country: initialData.location?.country || "",
-        // Custom fields that might not match the model directly
-        bioText: initialData.about || "",
-        liveIn: initialData.location?.city
-          ? `${initialData.location.city}, ${
-              initialData.location.country || ""
-            }`.trim()
-          : "",
-        hometown: initialData.hometown || "",
-        workplace:
-          initialData.work && initialData.work[0]
-            ? `${initialData.work[0].company || ""} - ${
-                initialData.work[0].position || ""
-              }`.trim()
-            : "",
-        education:
-          initialData.education && initialData.education[0]
-            ? `${initialData.education[0].school || ""} - ${
-                initialData.education[0].degree || ""
-              }`.trim()
-            : "",
-      });
+    try {
+      if (initialData) {
+        // Safely extract data from initialData
+        const safeInitialData = {
+          about: initialData.about || "",
+          relationship: initialData.relationship || "",
+          phone: initialData.phone || "",
+          website: initialData.website || "",
+          // Simplified fields for location
+          city: initialData.location?.city || "",
+          country: initialData.location?.country || "",
+          // Custom fields that might not match the model directly
+          bioText: initialData.about || "",
+          liveIn: "",
+          hometown: initialData.hometown || "",
+          workplace: "",
+          education: "",
+        };
+
+        // Safely build liveIn string
+        if (initialData.location?.city) {
+          safeInitialData.liveIn = `${initialData.location.city}${
+            initialData.location.country
+              ? ", " + initialData.location.country
+              : ""
+          }`;
+        }
+
+        // Safely build workplace string
+        if (
+          initialData.work &&
+          Array.isArray(initialData.work) &&
+          initialData.work[0]
+        ) {
+          const company = initialData.work[0].company || "";
+          const position = initialData.work[0].position || "";
+          safeInitialData.workplace =
+            company + (position ? ` - ${position}` : "");
+        }
+
+        // Safely build education string
+        if (
+          initialData.education &&
+          Array.isArray(initialData.education) &&
+          initialData.education[0]
+        ) {
+          const school = initialData.education[0].school || "";
+          const degree = initialData.education[0].degree || "";
+          safeInitialData.education = school + (degree ? ` - ${degree}` : "");
+        }
+
+        // Reset form with safe data
+        reset(safeInitialData);
+
+        console.log("Form reset with data:", safeInitialData);
+      }
+    } catch (error) {
+      console.error("Error in EditBio useEffect:", error);
     }
   }, [initialData, reset]);
 
   const handleEditBio = async (data) => {
     try {
+      if (!data) {
+        console.error("No data provided to handleEditBio");
+        showErrorToast("Gagal memperbarui profil: Data tidak valid");
+        return;
+      }
+
+      console.log("Submitting bio data:", data);
+
       // Prepare data for API
       const bioData = {
         about: data.bioText || data.about || "",
         relationship: data.relationship || "",
         phone: data.phone || "",
         website: data.website || "",
-        // Parse location from liveIn
+        hometown: data.hometown || "",
+        // Parse location from liveIn or city/country fields
         location: {
           city:
             data.city || (data.liveIn ? data.liveIn.split(",")[0]?.trim() : ""),
@@ -85,36 +115,53 @@ const EditBio = ({ isOpen, onClose, initialData, id, fetchProfile }) => {
               ? data.liveIn.split(",")[1]?.trim()
               : ""),
         },
-        // Simplified work and education arrays
-        work: [
-          {
-            company: data.workplace ? data.workplace.split("-")[0]?.trim() : "",
-            position:
-              data.workplace && data.workplace.includes("-")
-                ? data.workplace.split("-")[1]?.trim()
-                : "",
-            current: true,
-          },
-        ],
-        education: [
-          {
-            school: data.education ? data.education.split("-")[0]?.trim() : "",
-            degree:
-              data.education && data.education.includes("-")
-                ? data.education.split("-")[1]?.trim()
-                : "",
-            current: false,
-          },
-        ],
       };
 
-      await createOrUpdateUserBio(id, bioData);
+      // Safely create work array
+      const workItem = {};
+      if (data.workplace) {
+        const parts = data.workplace.split("-");
+        workItem.company = parts[0]?.trim() || "";
+        workItem.position = parts.length > 1 ? parts[1]?.trim() : "";
+        workItem.current = true;
+      } else {
+        workItem.company = "";
+        workItem.position = "";
+        workItem.current = true;
+      }
+      bioData.work = [workItem];
+
+      // Safely create education array
+      const educationItem = {};
+      if (data.education) {
+        const parts = data.education.split("-");
+        educationItem.school = parts[0]?.trim() || "";
+        educationItem.degree = parts.length > 1 ? parts[1]?.trim() : "";
+        educationItem.current = false;
+      } else {
+        educationItem.school = "";
+        educationItem.degree = "";
+        educationItem.current = false;
+      }
+      bioData.education = [educationItem];
+
+      console.log("Formatted bio data for API:", bioData);
+
+      // Call API to update bio
+      const updatedBio = await createOrUpdateUserBio(id, bioData);
+      console.log("API response for bio update:", updatedBio);
+
+      // Show success message
       showSuccessToast("Profil berhasil diperbarui");
+
+      // Refresh profile data to get the latest changes
       await fetchProfile();
+
+      // Close the dialog
       onClose();
     } catch (error) {
       console.error("Error creating or updating user bio:", error);
-      showErrorToast("Gagal memperbarui profil");
+      showErrorToast("Gagal memperbarui profil: " + error.message);
     }
   };
   return (
@@ -124,7 +171,17 @@ const EditBio = ({ isOpen, onClose, initialData, id, fetchProfile }) => {
           <DialogTitle>Edit Bio</DialogTitle>
           <DialogDescription className="sr-only"></DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(handleEditBio)}>
+        <form
+          onSubmit={(e) => {
+            try {
+              return handleSubmit(handleEditBio)(e);
+            } catch (error) {
+              console.error("Error in form submission:", error);
+              showErrorToast("Gagal memperbarui profil: Terjadi kesalahan");
+              return false;
+            }
+          }}
+        >
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="bioText" className="text-right">
@@ -166,23 +223,22 @@ const EditBio = ({ isOpen, onClose, initialData, id, fetchProfile }) => {
               <Label htmlFor="relationship" className="text-right">
                 Status Hubungan
               </Label>
-              <Select {...register("relationship")}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Pilih status hubungan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Single">Lajang</SelectItem>
-                  <SelectItem value="In a relationship">
-                    Dalam Hubungan
-                  </SelectItem>
-                  <SelectItem value="Engaged">Bertunangan</SelectItem>
-                  <SelectItem value="Married">Menikah</SelectItem>
-                  <SelectItem value="Complicated">Rumit</SelectItem>
-                  <SelectItem value="Separated">Berpisah</SelectItem>
-                  <SelectItem value="Divorced">Bercerai</SelectItem>
-                  <SelectItem value="Widowed">Menduda/Menjanda</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="col-span-3">
+                <select
+                  {...register("relationship")}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Pilih status hubungan</option>
+                  <option value="Single">Lajang</option>
+                  <option value="In a relationship">Dalam Hubungan</option>
+                  <option value="Engaged">Bertunangan</option>
+                  <option value="Married">Menikah</option>
+                  <option value="Complicated">Rumit</option>
+                  <option value="Separated">Berpisah</option>
+                  <option value="Divorced">Bercerai</option>
+                  <option value="Widowed">Menduda/Menjanda</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">

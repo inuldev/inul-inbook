@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useForm } from "react-hook-form";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, PenLine, Save, Upload, X, AlertCircle } from "lucide-react";
 
@@ -10,13 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import userStore from "@/store/userStore";
 import {
@@ -42,13 +35,39 @@ const ProfileHeader = ({
   const [error, setError] = useState("");
   const { setUser } = userStore();
 
-  const { register, handleSubmit, setValue } = useForm({
-    defaultValues: {
-      username: profileData?.username,
-      dateOfBirth: profileData?.dateOfBirth?.split("T")[0],
-      gender: profileData?.gender,
-    },
-  });
+  // Use useEffect to update form values when profileData changes
+  const { register, handleSubmit, reset } = useForm();
+
+  useEffect(() => {
+    try {
+      if (profileData) {
+        // Format date properly for the date input
+        let formattedDate = "";
+        if (profileData.dateOfBirth) {
+          try {
+            formattedDate = profileData.dateOfBirth.split("T")[0];
+          } catch (error) {
+            console.error("Error formatting date:", error);
+          }
+        }
+
+        // Reset form with current profile data
+        reset({
+          username: profileData.username || "",
+          dateOfBirth: formattedDate,
+          gender: profileData.gender || "",
+        });
+
+        console.log("Form reset with profile data:", {
+          username: profileData.username,
+          dateOfBirth: formattedDate,
+          gender: profileData.gender,
+        });
+      }
+    } catch (error) {
+      console.error("Error in ProfileHeader useEffect:", error);
+    }
+  }, [profileData, reset]);
 
   const profileImageInputRef = useRef();
   const coverImageInputRef = useRef();
@@ -58,16 +77,36 @@ const ProfileHeader = ({
       setError("");
       setLoading(true);
 
+      console.log("Submitting profile data:", data);
+
       // Validate inputs
-      if (!data.username || data.username.trim() === "") {
+      if (!data || !data.username || data.username.trim() === "") {
         setError("Nama pengguna tidak boleh kosong");
         return;
       }
 
       const formData = new FormData();
       formData.append("username", data.username);
-      formData.append("dateOfBirth", data.dateOfBirth);
-      formData.append("gender", data.gender);
+
+      // Make sure dateOfBirth is properly formatted
+      if (data.dateOfBirth) {
+        try {
+          // Validate date format (YYYY-MM-DD)
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (dateRegex.test(data.dateOfBirth)) {
+            formData.append("dateOfBirth", data.dateOfBirth);
+            console.log(`Added dateOfBirth to form: ${data.dateOfBirth}`);
+          } else {
+            console.warn(`Invalid date format: ${data.dateOfBirth}`);
+          }
+        } catch (error) {
+          console.error("Error processing date:", error);
+        }
+      }
+
+      if (data.gender) {
+        formData.append("gender", data.gender);
+      }
 
       if (profilePictureFile) {
         // Validate file size (max 5MB)
@@ -76,44 +115,63 @@ const ProfileHeader = ({
           return;
         }
         formData.append("profilePicture", profilePictureFile);
+        console.log(
+          "Adding profile picture to form data",
+          profilePictureFile.name
+        );
       }
 
+      console.log("Sending profile update request...");
       const updateProfile = await updateUserProfile(id, formData);
+      console.log("Profile update response:", updateProfile);
 
       // Update local state with the new profile data
-      if (profilePictureFile) {
-        // If we updated the profile picture, make sure it's reflected in the UI
+      try {
+        // Make a deep copy of the current profile data
+        const currentProfileData = JSON.parse(
+          JSON.stringify(profileData || {})
+        );
+
+        // Create updated profile data by merging current data with update response
         const updatedProfileData = {
-          ...profileData,
+          ...currentProfileData,
           ...updateProfile,
-          profilePicture:
-            updateProfile.profilePicture || profileData.profilePicture,
         };
+
+        // If we updated the profile picture, make sure it's reflected in the UI
+        if (profilePictureFile && updateProfile.profilePicture) {
+          updatedProfileData.profilePicture = updateProfile.profilePicture;
+        }
+
+        console.log("Current profile data:", currentProfileData);
+        console.log("Update response:", updateProfile);
+        console.log("Updated profile data:", updatedProfileData);
+
+        // Update local state
         setProfileData(updatedProfileData);
 
         // Update user in userStore to refresh all components using the user data
-        setUser({
-          ...updateProfile,
-          profilePicture:
-            updateProfile.profilePicture || profileData.profilePicture,
-        });
+        setUser(updatedProfileData);
 
         // Force a refresh of the user data in the store
+        console.log("Refreshing user data in store...");
         await userStore.getState().getCurrentUser();
-      } else {
-        setProfileData({ ...profileData, ...updateProfile });
-        setUser(updateProfile);
+
+        // Refresh profile data from server to ensure we have the latest data
+        console.log("Refreshing profile data from server...");
+        await fetchProfile();
+      } catch (updateError) {
+        console.error("Error updating profile data:", updateError);
       }
 
       setIsEditProfileModel(false);
       setProfilePicturePreview(null);
       setProfilePictureFile(null);
-      await fetchProfile();
       showSuccessToast("Profil berhasil diperbarui");
     } catch (error) {
       console.error("Error updating user profile:", error);
-      showErrorToast("Gagal memperbarui profil");
-      setError("Terjadi kesalahan saat memperbarui profil");
+      showErrorToast("Gagal memperbarui profil: " + error.message);
+      setError("Terjadi kesalahan saat memperbarui profil: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -130,8 +188,11 @@ const ProfileHeader = ({
   };
 
   const onSubmitCoverPhoto = async (e) => {
-    e.preventDefault();
     try {
+      if (e && e.preventDefault) {
+        e.preventDefault();
+      }
+
       setError("");
       setLoading(true);
 
@@ -143,41 +204,67 @@ const ProfileHeader = ({
           return;
         }
         formData.append("coverPhoto", coverPhotoFile);
+        console.log("Sending cover photo update request...");
+        console.log(
+          "Cover photo file:",
+          coverPhotoFile.name,
+          coverPhotoFile.size
+        );
       } else {
         setError("Silakan pilih foto sampul terlebih dahulu");
         return;
       }
 
       const updateProfile = await updateUserCoverPhoto(id, formData);
+      console.log("Cover photo update response:", updateProfile);
 
       // Make sure the coverPhoto is updated in the UI
-      if (updateProfile && updateProfile.coverPhoto) {
-        setProfileData({
-          ...profileData,
-          coverPhoto: updateProfile.coverPhoto,
-        });
+      try {
+        if (updateProfile && updateProfile.coverPhoto) {
+          // Make a deep copy of the current profile data
+          const currentProfileData = JSON.parse(
+            JSON.stringify(profileData || {})
+          );
 
-        // Update user in userStore to refresh all components using the user data
-        setUser({
-          ...updateProfile,
-          coverPhoto: updateProfile.coverPhoto,
-        });
+          // Create updated profile data by merging current data with update response
+          const updatedProfileData = {
+            ...currentProfileData,
+            ...updateProfile,
+            coverPhoto: updateProfile.coverPhoto,
+          };
 
-        // Force a refresh of the user data in the store
-        await userStore.getState().getCurrentUser();
+          console.log("Current profile data:", currentProfileData);
+          console.log("Update response:", updateProfile);
+          console.log("Updated profile data:", updatedProfileData);
+
+          // Update local state
+          setProfileData(updatedProfileData);
+
+          // Update user in userStore to refresh all components using the user data
+          setUser(updatedProfileData);
+
+          // Force a refresh of the user data in the store
+          console.log("Refreshing user data in store...");
+          await userStore.getState().getCurrentUser();
+
+          // Refresh profile data from server to ensure we have the latest data
+          console.log("Refreshing profile data from server...");
+          await fetchProfile();
+        }
+      } catch (updateError) {
+        console.error("Error updating profile data:", updateError);
       }
 
       setIsEditCoverModel(false);
       setCoverPhotoFile(null);
       setCoverPhotoPreview(null);
       showSuccessToast("Foto sampul berhasil diperbarui");
-
-      // Refresh profile data to ensure we have the latest version
-      await fetchProfile();
     } catch (error) {
       console.error("Error updating user cover photo:", error);
-      showErrorToast("Gagal memperbarui foto sampul");
-      setError("Terjadi kesalahan saat memperbarui foto sampul");
+      showErrorToast("Gagal memperbarui foto sampul: " + error.message);
+      setError(
+        "Terjadi kesalahan saat memperbarui foto sampul: " + error.message
+      );
     } finally {
       setLoading(false);
     }
@@ -318,9 +405,11 @@ const ProfileHeader = ({
                     />
                     <AvatarFallback className="dark:bg-gray-400">
                       {profileData?.username
-                        ?.split(" ")
-                        .map((name) => name[0])
-                        .join("")}
+                        ? profileData.username
+                            .split(" ")
+                            .map((name) => name[0])
+                            .join("")
+                        : "U"}
                     </AvatarFallback>
                   </Avatar>
                   <input
@@ -355,19 +444,16 @@ const ProfileHeader = ({
 
                 <div>
                   <Label htmlFor="gender">Jenis Kelamin</Label>
-                  <Select
-                    onValueChange={(value) => setValue("gender", value)}
-                    defaultValue={profileData?.gender}
+                  <select
+                    id="gender"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    {...register("gender")}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih jenis kelamin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Laki-laki</SelectItem>
-                      <SelectItem value="female">Perempuan</SelectItem>
-                      <SelectItem value="other">Lainnya</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Pilih jenis kelamin</option>
+                    <option value="male">Laki-laki</option>
+                    <option value="female">Perempuan</option>
+                    <option value="other">Lainnya</option>
+                  </select>
                 </div>
                 <Button
                   type="submit"
