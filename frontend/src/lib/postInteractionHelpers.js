@@ -1,7 +1,7 @@
 /**
  * Post Interaction Helpers
  *
- * This module provides helper functions for post interactions (like, comment, share)
+ * This module provides helper functions for post interactions (like, comment, share, edit)
  * that can be used across different components.
  *
  * These functions are designed to:
@@ -13,6 +13,7 @@
 
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
+import config from "@/lib/config";
 import {
   showSuccessToast,
   showErrorToast,
@@ -252,4 +253,108 @@ export const generateSharedLink = (postId) => {
 
   console.log(`Generated shared link for post ${postId}: ${postUrl}`);
   return postUrl;
+};
+
+/**
+ * Edit a post
+ * @param {string} postId - The post ID
+ * @param {Object} postData - The updated post data
+ * @param {string} postData.content - The updated post content
+ * @param {string} postData.privacy - The updated post privacy setting
+ * @param {Object} postData.mediaData - The updated post media data (optional)
+ * @param {Function} onSuccess - Callback function to execute on successful edit
+ * @param {Function} onError - Callback function to execute on error
+ * @returns {Promise<Object>} - The updated post
+ */
+export const editPost = async (postId, postData, onSuccess, onError) => {
+  try {
+    // Get current user
+    const { user } = userStore.getState();
+
+    if (!user || !user._id) {
+      const error = new Error("Please log in to edit posts");
+      showErrorToast(error.message);
+      if (onError) onError(error);
+      return;
+    }
+
+    const { content, privacy, mediaData } = postData;
+
+    // Check if content is empty
+    if (!content || !content.trim()) {
+      const error = new Error("Post content cannot be empty");
+      showErrorToast(error.message);
+      if (onError) onError(error);
+      return;
+    }
+
+    // Get the post store
+    const postStore = usePostStore.getState();
+
+    // Check if media has changed
+    const isMediaChanged = mediaData && mediaData.url;
+
+    try {
+      let updatedPost;
+
+      // If media has changed or we're adding new media, use the direct upload endpoint
+      if (isMediaChanged) {
+        const response = await fetch(
+          `${config.backendUrl}/api/posts/${postId}/direct`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: content.trim(),
+              privacy,
+              mediaUrl: mediaData.url,
+              mediaType: mediaData.type,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.message || "Failed to update post");
+        }
+
+        // Update post in store
+        updatedPost = postStore.updatePostInStore(data.data);
+      } else {
+        // Regular update without media changes
+        updatedPost = await postStore.updatePost(postId, {
+          content: content.trim(),
+          privacy,
+        });
+      }
+
+      // Show success message
+      showSuccessToast("Post updated successfully");
+
+      // Call success callback if provided
+      if (onSuccess) onSuccess(updatedPost);
+
+      return updatedPost;
+    } catch (error) {
+      console.error("Error editing post:", error);
+      showErrorToast(error.message || "Failed to update post");
+
+      // Call error callback if provided
+      if (onError) onError(error);
+
+      throw error;
+    }
+  } catch (error) {
+    console.error("Error in edit post procedure:", error);
+    showErrorToast(error.message || "An unexpected error occurred");
+
+    // Call error callback if provided
+    if (onError) onError(error);
+
+    throw error;
+  }
 };

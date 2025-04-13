@@ -314,8 +314,6 @@ const BaseCard = ({
       return;
     }
 
-    // Call the callback to open edit form
-
     // Call the callback if provided
     if (onEdit) {
       onEdit(post);

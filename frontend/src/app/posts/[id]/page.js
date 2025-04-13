@@ -8,6 +8,7 @@ import Loader from "@/components/ui/loader";
 import { Button } from "@/components/ui/button";
 import BaseCard from "@/components/shared/BaseCard";
 import MediaCard from "@/components/shared/MediaCard";
+import EditPostForm from "../EditPostForm";
 import { Card, CardContent } from "@/components/ui/card";
 import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
 import { generateSharedLink } from "@/lib/postInteractionHelpers";
@@ -23,6 +24,7 @@ export default function PostDetailPage() {
   const [post, setPost] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
 
   // Function to handle sharing the current post
   const handleShareCurrentPost = async () => {
@@ -109,9 +111,30 @@ export default function PostDetailPage() {
         </Card>
       ) : post ? (
         post.mediaType === "video" ? (
-          <MediaCard post={post} />
+          <MediaCard
+            post={post}
+            onEdit={() => {
+              setIsEditFormOpen(true);
+            }}
+          />
         ) : (
-          <BaseCard post={post} />
+          <>
+            <BaseCard
+              post={post}
+              onEdit={() => {
+                setIsEditFormOpen(true);
+              }}
+            />
+
+            {/* Edit Post Form */}
+            {isEditFormOpen && (
+              <EditPostForm
+                isOpen={isEditFormOpen}
+                onClose={() => setIsEditFormOpen(false)}
+                post={post}
+              />
+            )}
+          </>
         )
       ) : (
         <Card>

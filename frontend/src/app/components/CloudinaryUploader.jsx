@@ -150,8 +150,8 @@ const CloudinaryUploader = ({
         `https://api.cloudinary.com/v1_1/${signatureData.data.cloudName}/${resourceType}/upload`
       );
 
-      // Set timeout (60 seconds for large files)
-      xhr.timeout = 60000;
+      // Set timeout (180 seconds for large files)
+      xhr.timeout = 180000;
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

@@ -5,12 +5,15 @@ import React, { useState, useEffect } from "react";
 import MediaCard from "@/components/shared/MediaCard";
 import NewPostForm from "../posts/NewPostForm";
 import StorySection from "../story/StorySection";
+import EditPostForm from "../posts/EditPostForm";
 
 import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
 
 const HomePage = () => {
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const { posts, fetchPosts, loading, error } = usePostStore();
   const { user } = userStore();
 
@@ -75,8 +78,27 @@ const HomePage = () => {
           // Always show posts if we have them, even while loading more
           <>
             {posts.map((post) => (
-              <MediaCard key={post?._id} post={post} />
+              <MediaCard
+                key={post?._id}
+                post={post}
+                onEdit={() => {
+                  setEditingPost(post);
+                  setIsEditFormOpen(true);
+                }}
+              />
             ))}
+
+            {/* Edit Post Form */}
+            {isEditFormOpen && editingPost && (
+              <EditPostForm
+                isOpen={isEditFormOpen}
+                onClose={() => {
+                  setIsEditFormOpen(false);
+                  setEditingPost(null);
+                }}
+                post={editingPost}
+              />
+            )}
             {loading && (
               <div className="flex justify-center py-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>

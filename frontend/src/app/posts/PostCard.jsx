@@ -6,10 +6,10 @@
  * A component for displaying posts in the posts page.
  * This component extends BaseCard with specific functionality for posts.
  */
-
 import React, { useState } from "react";
-import BaseCard from "@/components/shared/BaseCard";
+
 import EditPostForm from "./EditPostForm";
+import BaseCard from "@/components/shared/BaseCard";
 
 /**
  * PostCard Component
@@ -19,8 +19,6 @@ import EditPostForm from "./EditPostForm";
  */
 const PostCard = ({ post }) => {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
-
-  // No need to pass commentsComponent anymore as BaseCard now uses EnhancedCommentSystem directly
 
   // Handle edit callback
   const handleEdit = () => {

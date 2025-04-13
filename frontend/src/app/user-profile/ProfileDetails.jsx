@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatTanggal, formatDate } from "@/lib/utils";
 import { usePostStore } from "@/store/usePostStore";
+import EditPostForm from "../posts/EditPostForm";
 import { Card, CardContent } from "@/components/ui/card";
 import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -44,6 +45,8 @@ const ProfileDetails = ({
 }) => {
   const [likePosts, setLikePosts] = useState(new Set());
   const [isEditBioModel, setIsEditBioModel] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
 
   const {
     userPosts,
@@ -108,8 +111,24 @@ const ProfileDetails = ({
                 await handleSharePost(post?._id);
                 await fetchProfile();
               }}
+              onEdit={(post) => {
+                setEditingPost(post);
+                setIsEditFormOpen(true);
+              }}
             />
           ))}
+
+          {/* Edit Post Form */}
+          {isEditFormOpen && editingPost && (
+            <EditPostForm
+              isOpen={isEditFormOpen}
+              onClose={() => {
+                setIsEditFormOpen(false);
+                setEditingPost(null);
+              }}
+              post={editingPost}
+            />
+          )}
         </div>
         <div className="w-full lg:w-[30%]">
           <Card>

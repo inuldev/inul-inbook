@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
-import React, { useState } from "react";
-import { ImageIcon, Video, Laugh, Plus, X, AlertCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ImageIcon, Laugh, X, AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,16 +24,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import usePostStore from "@/store/postStore";
 import userStore from "@/store/userStore";
+import usePostStore from "@/store/postStore";
+import { editPost } from "@/lib/postInteractionHelpers";
+
 import CloudinaryUploader from "../components/CloudinaryUploader";
-import config from "@/lib/config";
 
 const Picker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
 const EditPostForm = ({ isOpen, onClose, post }) => {
   const { user } = userStore();
-  const { updatePost, loading } = usePostStore();
+  const { fetchPost } = usePostStore();
 
   const [postContent, setPostContent] = useState(post?.content || "");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -48,6 +49,29 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
       : null
   );
   const [postError, setPostError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch the latest post data when the form opens
+  useEffect(() => {
+    if (isOpen && post?._id) {
+      fetchPost(post._id, false, true)
+        .then((updatedPost) => {
+          // Update form fields with the latest data
+          setPostContent(updatedPost.content || "");
+          setPrivacy(updatedPost.privacy || "public");
+          if (updatedPost.mediaUrl) {
+            setMediaData({
+              url: updatedPost.mediaUrl,
+              type: updatedPost.mediaType,
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching post data:", error);
+          // Don't show error to user as we already have initial data
+        });
+    }
+  }, [isOpen, post?._id, fetchPost]);
 
   const handleEmojiClick = (emojiObject) => {
     setPostContent((prev) => prev + emojiObject.emoji);
@@ -68,48 +92,36 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
       return;
     }
 
+    setIsSubmitting(true);
+    setPostError(null);
+
+    // Prepare post data for update
+    const postData = {
+      content: postContent,
+      privacy,
+      mediaData: mediaData,
+    };
+
+    // Use the editPost helper function
     try {
-      setPostError(null);
-
-      // Check if media has changed or if we're using the original media
-      const isMediaChanged = mediaData && mediaData.url !== post?.mediaUrl;
-
-      // If media has changed or we're adding new media, use the direct upload endpoint
-      if (isMediaChanged || (mediaData && !post?.mediaUrl)) {
-        await fetch(`${config.backendUrl}/api/posts/${post._id}/direct`, {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            content: postContent,
-            privacy,
-            mediaUrl: mediaData.url,
-            mediaType: mediaData.type,
-          }),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (!data.success) {
-              throw new Error(data.message || "Failed to update post");
-            }
-
-            // Update post in store
-            usePostStore.getState().updatePostInStore(data.data);
-          });
-      } else {
-        // Regular update without media changes
-        await updatePost(post._id, {
-          content: postContent,
-          privacy,
-        });
-      }
-
-      // Close form
-      onClose();
+      await editPost(
+        post._id,
+        postData,
+        // Success callback
+        () => {
+          setIsSubmitting(false);
+          onClose(); // Close form on success
+        },
+        // Error callback
+        (error) => {
+          setIsSubmitting(false);
+          setPostError(error.message || "Failed to update post");
+        }
+      );
     } catch (error) {
-      setPostError(error.message);
+      // This catch block handles any errors not caught by the error callback
+      setIsSubmitting(false);
+      setPostError(error.message || "An unexpected error occurred");
     }
   };
 
@@ -267,9 +279,16 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
           <Button
             className="bg-blue-500 text-white hover:bg-blue-600"
             onClick={handleUpdatePost}
-            disabled={loading || !postContent.trim()}
+            disabled={isSubmitting || !postContent.trim()}
           >
-            {loading ? "Updating..." : "Update"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              "Update"
+            )}
           </Button>
         </div>
       </DialogContent>

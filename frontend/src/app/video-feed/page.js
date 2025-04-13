@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import MediaCard from "@/components/shared/MediaCard";
+import EditPostForm from "../posts/EditPostForm";
 import usePostStore from "@/store/postStore";
 
 export default function VideoFeedPage() {
@@ -13,6 +14,8 @@ export default function VideoFeedPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [videoPosts, setVideoPosts] = useState([]);
+  const [editingPost, setEditingPost] = useState(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
 
   // Load video posts on mount
   useEffect(() => {
@@ -79,8 +82,28 @@ export default function VideoFeedPage() {
       ) : videoPosts.length > 0 ? (
         <div className="max-w-3xl mx-auto space-y-6">
           {videoPosts.map((post) => (
-            <MediaCard key={post?._id} post={post} isVideoFeed={true} />
+            <MediaCard
+              key={post?._id}
+              post={post}
+              isVideoFeed={true}
+              onEdit={() => {
+                setEditingPost(post);
+                setIsEditFormOpen(true);
+              }}
+            />
           ))}
+
+          {/* Edit Post Form */}
+          {isEditFormOpen && editingPost && (
+            <EditPostForm
+              isOpen={isEditFormOpen}
+              onClose={() => {
+                setIsEditFormOpen(false);
+                setEditingPost(null);
+              }}
+              post={editingPost}
+            />
+          )}
         </div>
       ) : (
         <Card>
