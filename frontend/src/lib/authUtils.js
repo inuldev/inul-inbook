@@ -351,20 +351,29 @@ export function getTokenFromCookie(cookieName) {
 }
 
 /**
- * Menghapus semua data autentikasi
- * @returns {boolean} True jika berhasil, false jika gagal
+ * Menghapus semua data autentikasi secara komprehensif
+ * @returns {Promise<boolean>} Promise yang mengembalikan true jika berhasil, false jika gagal
  */
-export function clearAuthData() {
-  console.log("Clearing all authentication data");
+export async function clearAllAuthData() {
+  console.log("Clearing all authentication data comprehensively");
   let success = true;
 
   try {
     // 1. Clear localStorage if available
     if (isLocalStorageAvailable()) {
       try {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("auth_token_backup");
+        // Hapus semua item auth dari localStorage
+        const authKeys = [
+          "auth_token",
+          "auth_user",
+          "auth_token_backup",
+          "auth_error",
+          "auth_redirect",
+          "user_data",
+          "token",
+        ];
+
+        authKeys.forEach((key) => localStorage.removeItem(key));
         console.log("Cleared localStorage authentication data");
       } catch (lsError) {
         console.error("Error clearing localStorage:", lsError);
@@ -372,31 +381,105 @@ export function clearAuthData() {
       }
     }
 
-    // Kita tidak lagi menggunakan sessionStorage dan window object untuk autentikasi
-    // Jadi kita tidak perlu membersihkannya
+    // 2. Clear sessionStorage if available
+    if (isSessionStorageAvailable()) {
+      try {
+        // Hapus semua item auth dari sessionStorage
+        const authKeys = [
+          "auth_token",
+          "auth_user",
+          "auth_token_backup",
+          "auth_error",
+          "auth_redirect",
+          "user_data",
+          "token",
+        ];
 
-    // 4. Clear cookies if available
+        authKeys.forEach((key) => sessionStorage.removeItem(key));
+        console.log("Cleared sessionStorage authentication data");
+      } catch (ssError) {
+        console.error("Error clearing sessionStorage:", ssError);
+        success = false;
+      }
+    }
+
+    // 3. Clear window object if available
+    if (typeof window !== "undefined") {
+      try {
+        // Hapus semua properti auth dari window object
+        const windowProps = ["authToken", "authUser", "userData", "token"];
+
+        windowProps.forEach((prop) => {
+          if (window[prop]) delete window[prop];
+        });
+
+        console.log("Cleared window object authentication data");
+      } catch (winError) {
+        console.error("Error clearing window object:", winError);
+        success = false;
+      }
+    }
+
+    // 4. Clear cookies with multiple approaches
     if (isCookiesAvailable()) {
       try {
-        // Standardize cookie names to clear
+        // Daftar semua cookie yang mungkin digunakan untuk autentikasi
         const cookiesToClear = [
           "token",
           "auth_status",
           "dev_token",
           "dev_auth_status",
+          "auth_token_direct",
+          "auth_token",
+          "refresh_token",
+          "session_id",
         ];
 
-        // Hapus cookie dengan berbagai opsi untuk memastikan terhapus
+        // Hapus dengan berbagai kombinasi pengaturan
         cookiesToClear.forEach((cookieName) => {
-          // Hapus dengan path=/ (standar)
+          // Metode 1: Hapus dengan path=/ (standar)
           document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 
-          // Hapus dengan Secure dan SameSite=None untuk produksi
+          // Metode 2: Hapus dengan Secure dan SameSite=None untuk produksi
           document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=None`;
 
-          // Hapus dengan SameSite=Lax untuk development
+          // Metode 3: Hapus dengan SameSite=Lax untuk development
           document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+
+          // Metode 4: Hapus dengan domain (untuk subdomain sharing)
+          try {
+            const domain = window.location.hostname
+              .split(".")
+              .slice(-2)
+              .join(".");
+            document.cookie = `${cookieName}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+          } catch (e) {}
         });
+
+        // Verifikasi apakah cookies benar-benar dihapus
+        setTimeout(() => {
+          const remainingCookies = document.cookie.split("; ");
+          const authCookiesRemaining = cookiesToClear.filter((name) =>
+            remainingCookies.some((c) => c.startsWith(`${name}=`))
+          );
+
+          if (authCookiesRemaining.length > 0) {
+            console.warn(
+              "Some auth cookies could not be cleared:",
+              authCookiesRemaining
+            );
+
+            // Coba sekali lagi dengan metode yang lebih agresif
+            authCookiesRemaining.forEach((cookieName) => {
+              // Coba dengan path yang berbeda
+              ["/", "", "/api", "/auth"].forEach((path) => {
+                document.cookie = `${cookieName}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+              });
+            });
+          } else {
+            console.log("All auth cookies successfully cleared");
+          }
+        }, 100);
 
         console.log("Cleared all cookies authentication data");
       } catch (cookieError) {
@@ -405,28 +488,40 @@ export function clearAuthData() {
       }
     }
 
-    // 5. Reset Zustand store
+    // 5. Reset Zustand store if available
     try {
-      userStore.setState({
-        user: null,
-        token: null,
-        tokenFromUrl: null,
-        isAuthenticated: false,
-        loading: false,
-        error: null,
-      });
-      console.log("Reset Zustand store");
+      if (typeof userStore !== "undefined" && userStore.setState) {
+        userStore.setState({
+          user: null,
+          token: null,
+          tokenFromUrl: null,
+          isAuthenticated: false,
+          loading: false,
+          error: null,
+        });
+        console.log("Reset Zustand store");
+      }
     } catch (storeError) {
       console.error("Error resetting Zustand store:", storeError);
       success = false;
     }
 
-    console.log("All authentication data cleared");
+    console.log("All authentication data cleared comprehensively");
     return success;
   } catch (error) {
-    console.error("Error clearing authentication data:", error);
+    console.error("Error in clearAllAuthData:", error);
     return false;
   }
+}
+
+/**
+ * Menghapus semua data autentikasi (versi lama untuk kompatibilitas)
+ * @returns {boolean} True jika berhasil, false jika gagal
+ */
+export function clearAuthData() {
+  console.log("Legacy clearAuthData called, using clearAllAuthData instead");
+  clearAllAuthData();
+  return true;
 }
 
 /**

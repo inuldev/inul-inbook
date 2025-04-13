@@ -49,6 +49,9 @@ const LeftSideBar = () => {
 
   const handleLogout = async () => {
     try {
+      console.log("Logout button clicked in LeftSideBar");
+
+      // Panggil fungsi logout dari userStore
       await logout();
       console.log("Logout successful");
 
@@ -57,12 +60,37 @@ const LeftSideBar = () => {
       window.location.href = "/user-login";
     } catch (error) {
       console.error("Logout failed:", error);
-      // Manually clear the cookies if the server request fails
-      document.cookie =
-        "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      document.cookie =
-        "auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-      console.log("Manually cleared token cookies");
+
+      // Jika logout gagal, coba hapus cookie secara manual dengan berbagai metode
+      try {
+        // Hapus semua cookie autentikasi yang mungkin ada
+        const cookiesToClear = [
+          "token",
+          "auth_status",
+          "dev_token",
+          "dev_auth_status",
+          "auth_token_direct",
+          "auth_token",
+          "refresh_token",
+        ];
+
+        // Hapus dengan berbagai kombinasi pengaturan
+        cookiesToClear.forEach((cookieName) => {
+          // Metode 1: Hapus dengan path=/ (standar)
+          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+
+          // Metode 2: Hapus dengan Secure dan SameSite=None untuk produksi
+          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=None`;
+
+          // Metode 3: Hapus dengan SameSite=Lax untuk development
+          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+        });
+
+        console.log("Manually cleared all auth cookies");
+      } catch (clearError) {
+        console.error("Error clearing cookies manually:", clearError);
+      }
+
       // Force logout even if it fails using window.location for full page refresh
       window.location.href = "/user-login";
     }

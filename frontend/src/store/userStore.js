@@ -6,7 +6,12 @@ import {
   hasCookie,
   getAllCookies,
 } from "@/lib/cookieUtils";
-import { storeToken, storeUserData, clearAuthData } from "@/lib/authUtils";
+import {
+  storeToken,
+  storeUserData,
+  clearAuthData,
+  clearAllAuthData,
+} from "@/lib/authUtils";
 
 const userStore = create((set, get) => ({
   user: null,
@@ -460,7 +465,23 @@ const userStore = create((set, get) => ({
 
   logout: async () => {
     try {
-      // Send a request to the backend to clear the session
+      console.log("Starting logout process");
+
+      // First, clear all client-side storage before making the API call
+      // This ensures we clean up even if the API call fails
+      await clearAllAuthData();
+
+      // Reset state immediately for better UX
+      set({
+        user: null,
+        isAuthenticated: false,
+        error: null,
+        tokenFromUrl: null,
+        token: null,
+        loading: false,
+      });
+
+      // Then send a request to the backend to clear the session
       const response = await fetch(`${config.backendUrl}/api/auth/logout`, {
         method: "GET",
         credentials: "include",
@@ -471,111 +492,26 @@ const userStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error("Logout failed");
+        throw new Error("Logout API call failed");
       }
-
-      // Clear all cookies
-      deleteCookie("token", {
-        path: "/",
-        secure: window.location.protocol === "https:",
-        sameSite: "none",
-      });
-      deleteCookie("auth_status", {
-        path: "/",
-        secure: window.location.protocol === "https:",
-        sameSite: "lax",
-      });
-      deleteCookie("dev_token", {
-        path: "/",
-        secure: window.location.protocol === "https:",
-        sameSite: "none",
-      });
-      deleteCookie("auth_token_direct", {
-        path: "/",
-        secure: window.location.protocol === "https:",
-        sameSite: "lax",
-      });
-      console.log("Cleared all auth cookies");
-
-      // Clear all storage auth data
-      if (typeof window !== "undefined") {
-        // Clear localStorage
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_user");
-        localStorage.removeItem("auth_token_backup");
-
-        // Clear sessionStorage
-        sessionStorage.removeItem("auth_token");
-        sessionStorage.removeItem("auth_user");
-        sessionStorage.removeItem("auth_token_backup");
-
-        // Clear window object
-        if (window.authToken) delete window.authToken;
-        if (window.authUser) delete window.authUser;
-
-        // Use clearAuthData utility function for additional cleanup
-        clearAuthData();
-
-        console.log("Cleared all storage auth data");
-      }
-
-      // Reset state
-      set({
-        user: null,
-        isAuthenticated: false,
-        error: null,
-        tokenFromUrl: null,
-        token: null,
-        loading: false,
-      });
 
       console.log("Logout successful, all auth data cleared");
     } catch (error) {
-      console.error("Error logging out:", error);
+      console.error("Error during logout process:", error);
       set({ error: error.message });
 
-      // Even if the server request fails, still clear all auth data
+      // Make sure we still clear everything even if the API call fails
       try {
-        // Clear cookies manually
-        document.cookie =
-          "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie =
-          "auth_status=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie =
-          "dev_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-        document.cookie =
-          "auth_token_direct=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-        // Clear all storage
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("auth_user");
-          localStorage.removeItem("auth_token_backup");
-
-          sessionStorage.removeItem("auth_token");
-          sessionStorage.removeItem("auth_user");
-          sessionStorage.removeItem("auth_token_backup");
-
-          if (window.authToken) delete window.authToken;
-          if (window.authUser) delete window.authUser;
-
-          clearAuthData();
-        }
-
-        console.log("Manually cleared all auth data after logout error");
+        await clearAllAuthData();
       } catch (clearError) {
-        console.error("Error clearing auth data:", clearError);
+        console.error("Error in final cleanup attempt:", clearError);
       }
-
-      // Reset state
-      set({
-        user: null,
-        isAuthenticated: false,
-        tokenFromUrl: null,
-        token: null,
-        loading: false,
-      });
     }
+  },
+
+  // Helper function to clear all auth data
+  clearAllAuthData: async () => {
+    return clearAllAuthData();
   },
 
   register: async (userData) => {

@@ -152,37 +152,91 @@ const login = async (req, res) => {
 // @access  Private
 const logout = (req, res) => {
   try {
-    // Clear the token cookie - use multiple approaches to ensure it's cleared
-    // Prepare cookie options
-    const cookieOptions = {
+    console.log("Logout endpoint called");
+
+    // Clear all possible auth cookies with multiple approaches to ensure they're cleared
+    const cookiesToClear = [
+      "token",
+      "auth_status",
+      "dev_token",
+      "dev_auth_status",
+      "auth_token_direct",
+      "auth_token",
+      "refresh_token",
+    ];
+
+    // Prepare base cookie options
+    const baseCookieOptions = {
       httpOnly: true,
       path: "/", // Add path to ensure cookie is cleared properly
     };
 
     // Handle SameSite and Secure attributes based on environment
+    const productionOptions = {
+      ...baseCookieOptions,
+      sameSite: "none",
+      secure: true,
+    };
+
+    const developmentOptions = {
+      ...baseCookieOptions,
+      sameSite: "lax",
+      secure: config.frontendUrl.startsWith("https"),
+    };
+
+    // Use the appropriate options based on environment
+    const cookieOptions = config.isProduction
+      ? productionOptions
+      : developmentOptions;
+
+    // Clear each cookie with multiple methods
+    cookiesToClear.forEach((cookieName) => {
+      // Method 1: Set to 'none' with short expiry
+      res.cookie(cookieName, "none", {
+        ...cookieOptions,
+        expires: new Date(Date.now() + 1000), // 1 second
+      });
+
+      // Method 2: Set empty value with expired date
+      res.cookie(cookieName, "", {
+        ...cookieOptions,
+        expires: new Date(0),
+      });
+
+      // Method 3: Try with different path
+      res.cookie(cookieName, "", {
+        ...cookieOptions,
+        path: "",
+        expires: new Date(0),
+      });
+
+      // Log each cookie clearing attempt
+      console.log(`Attempted to clear cookie: ${cookieName}`);
+    });
+
+    // Also try clearing with alternative settings
     if (config.isProduction) {
-      // In production, use SameSite=None with Secure=true
-      cookieOptions.sameSite = "none";
-      cookieOptions.secure = true;
+      // In production, also try with lax setting as fallback
+      cookiesToClear.forEach((cookieName) => {
+        res.cookie(cookieName, "", {
+          ...baseCookieOptions,
+          sameSite: "lax",
+          expires: new Date(0),
+        });
+      });
     } else {
-      // In development, use SameSite=Lax and Secure based on protocol
-      cookieOptions.sameSite = "lax";
-      cookieOptions.secure = config.frontendUrl.startsWith("https");
+      // In development, also try with none setting as fallback
+      cookiesToClear.forEach((cookieName) => {
+        res.cookie(cookieName, "", {
+          ...baseCookieOptions,
+          sameSite: "none",
+          secure: true,
+          expires: new Date(0),
+        });
+      });
     }
 
-    // Method 1: Set to 'none' with short expiry
-    res.cookie("token", "none", {
-      ...cookieOptions,
-      expires: new Date(Date.now() + 1000), // 1 second
-    });
-
-    // Method 2: Set empty value with expired date
-    res.cookie("token", "", {
-      ...cookieOptions,
-      expires: new Date(0),
-    });
-
-    console.log("Logout successful, cookie cleared");
+    console.log("Logout successful, all cookies cleared");
 
     res.status(200).json({
       success: true,
