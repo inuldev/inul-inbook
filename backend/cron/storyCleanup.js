@@ -1,42 +1,6 @@
 const Story = require("../model/Story");
 const { cloudinary } = require("../middleware/upload");
-
-// Helper function to extract public ID and resource type from Cloudinary URL
-const extractPublicIdFromUrl = (url) => {
-  try {
-    if (!url) return { publicId: null, resourceType: null };
-
-    // Determine resource type (image or video)
-    let resourceType = "image";
-    if (url.includes("/video/upload/")) {
-      resourceType = "video";
-    } else if (url.includes("/image/upload/")) {
-      resourceType = "image";
-    } else if (
-      url.toLowerCase().endsWith(".mp4") ||
-      url.toLowerCase().endsWith(".mov")
-    ) {
-      resourceType = "video";
-    }
-
-    // Extract the path after /upload/
-    const uploadIndex = url.indexOf("/upload/");
-    if (uploadIndex === -1) return { publicId: null, resourceType: null };
-
-    const pathAfterUpload = url.substring(uploadIndex + 8);
-
-    // Remove version number if present (v1234567890/)
-    const versionRemoved = pathAfterUpload.replace(/^v\d+\//, "");
-
-    // Remove file extension
-    const publicId = versionRemoved.replace(/\.[^/.]+$/, "");
-
-    return { publicId, resourceType };
-  } catch (error) {
-    console.error("Error extracting public ID:", error);
-    return { publicId: null, resourceType: null };
-  }
-};
+const { extractPublicIdFromUrl } = require("../utils/cloudinaryUtils");
 
 /**
  * Cleanup expired stories and their media from Cloudinary

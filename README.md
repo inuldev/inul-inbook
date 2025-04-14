@@ -1,5 +1,10 @@
 <h1 align="center">✨ Social Media App ✨</h1>
 
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README-ID.md">Bahasa Indonesia</a>
+</p>
+
 This project is a full-featured social media application similar to Facebook that allows users to share their thoughts, experiences, and media with others. It is built with a modern tech stack, including Next.js 14, Tailwind CSS, Shadcn/UI, and Zustand for state management on the frontend, and Node.js/Express.js with MongoDB on the backend.
 
 ## 🚀 Quick Start
@@ -281,6 +286,9 @@ The application has different behaviors based on the environment:
 - **Zustand**: Lightweight state management with persistent storage
 - **Responsive Design**: Mobile-friendly interface that works on all devices
 - **BaseCard Component**: Standardized card component for consistent UI across the application
+- **Optimistic UI**: Immediate feedback for user actions with background synchronization
+- **WebP Support**: Modern image format for better performance and quality
+- **Next.js Image Component**: Optimized image loading and rendering
 
 ### Backend Features
 
@@ -289,6 +297,8 @@ The application has different behaviors based on the environment:
 - **JWT Authentication**: Secure authentication with token-based sessions
 - **Google OAuth**: Social login integration
 - **Cloudinary Integration**: Cloud-based media storage with direct upload support
+- **Cron Jobs**: Automated tasks for maintenance (e.g., expired story cleanup)
+- **Media Management**: Automatic cleanup of unused media files
 
 ### Key Features
 
@@ -298,31 +308,52 @@ The application has different behaviors based on the environment:
    - Google OAuth integration
    - Profile customization with bio, profile picture, and cover photo
    - Follow/unfollow system
+   - Mutual friends display
+   - Friend suggestions
 
 2. **Posts and Content**:
 
-   - Create text posts with privacy settings
+   - Create text posts with privacy settings (public, friends, private)
    - Upload images (up to 10MB) and videos (up to 100MB)
+   - Edit and delete posts
    - Like, comment, and share functionality
+   - Reply to comments
+   - Edit and delete comments
    - Feed with posts from followed users
+   - Dedicated video feed
 
 3. **Stories**:
 
    - Create ephemeral content that expires after 24 hours
    - Support for images and videos (up to 5MB)
    - View count tracking
+   - Automatic cleanup of expired stories
 
 4. **User Interface**:
 
    - Dark/light theme support
    - Responsive design for mobile and desktop
-   - Real-time updates for likes and comments
+   - Optimistic UI updates for likes, comments, and other interactions
    - Infinite scrolling for content feeds
+   - Toast notifications for user feedback
+   - Loading states and skeletons for better UX
+   - Show more/less functionality for comments and replies
 
 5. **Profile and Discovery**:
+
    - Detailed user profiles with bio information
+   - Customizable profile with education, work, and personal details
    - User search functionality
    - Friend/follower management
+   - Profile and cover photo upload and management
+
+6. **Media Management**:
+
+   - Support for multiple image formats including WebP
+   - Video upload and playback
+   - Automatic media cleanup when content is deleted or updated
+   - Size validation and optimization
+   - Direct upload to Cloudinary for better performance
 
 ## 🔧 Troubleshooting
 
@@ -407,6 +438,24 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👋 Conclusion
 
-This social media application provides a solid foundation for building a Facebook-like platform. It includes all the essential features like authentication, posts, stories, and user interactions. The application has been refactored to use a more modular and maintainable structure, with standardized components and consistent implementations across the codebase.
+This social media application provides a comprehensive foundation for building a Facebook-like platform. It includes all the essential features expected from a modern social media application, including authentication, posts, stories, comments, user profiles, and media management.
+
+### Achievements
+
+- **Comprehensive Feature Set**: The application includes all core social media features and many advanced ones
+- **Optimized Performance**: Careful attention to performance with optimistic UI updates and efficient media handling
+- **Robust Architecture**: Clean separation of concerns with modular components and services
+- **Media Management**: Complete media lifecycle management with Cloudinary integration
+- **User Experience**: Focus on responsive design and intuitive interactions
+
+### Future Enhancements
+
+While the application is already feature-rich, there are some potential enhancements for future development:
+
+- **Real-time Messaging**: Implementation of a chat system (would require a different hosting solution than Vercel's hobby plan)
+- **Real-time Notifications**: Push notifications for user interactions
+- **Mobile App**: Native mobile application using React Native
+- **Analytics Dashboard**: User engagement metrics and content performance
+- **Content Moderation**: AI-powered content filtering and moderation tools
 
 For any questions or issues, please open an issue on the GitHub repository.

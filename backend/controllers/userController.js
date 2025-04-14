@@ -1,6 +1,8 @@
 const User = require("../model/User");
 const Bio = require("../model/Bio");
 const mongoose = require("mongoose");
+const { cloudinary } = require("../middleware/upload");
+const { extractPublicIdFromUrl } = require("../utils/cloudinaryUtils");
 
 // @desc    Get user profile
 // @route   GET /api/users/:id
@@ -139,6 +141,30 @@ const uploadProfilePicture = async (req, res) => {
       });
     }
 
+    // If user already has a profile picture, delete it from Cloudinary
+    if (user.profilePicture) {
+      try {
+        const { publicId, resourceType } = extractPublicIdFromUrl(
+          user.profilePicture
+        );
+        if (publicId) {
+          // Use the correct resource_type for deletion
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+          console.log(
+            `Deleted old profile picture from Cloudinary: ${publicId}`
+          );
+        }
+      } catch (cloudinaryError) {
+        console.error(
+          "Error deleting old profile picture from Cloudinary:",
+          cloudinaryError
+        );
+        // Continue with update even if Cloudinary deletion fails
+      }
+    }
+
     // Update profile picture
     user.profilePicture = req.file.path;
 
@@ -178,6 +204,28 @@ const uploadCoverPhoto = async (req, res) => {
         success: false,
         message: "User not found",
       });
+    }
+
+    // If user already has a cover photo, delete it from Cloudinary
+    if (user.coverPhoto) {
+      try {
+        const { publicId, resourceType } = extractPublicIdFromUrl(
+          user.coverPhoto
+        );
+        if (publicId) {
+          // Use the correct resource_type for deletion
+          await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType,
+          });
+          console.log(`Deleted old cover photo from Cloudinary: ${publicId}`);
+        }
+      } catch (cloudinaryError) {
+        console.error(
+          "Error deleting old cover photo from Cloudinary:",
+          cloudinaryError
+        );
+        // Continue with update even if Cloudinary deletion fails
+      }
     }
 
     // Update cover photo

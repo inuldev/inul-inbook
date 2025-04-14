@@ -1,6 +1,6 @@
 # Perubahan dan Penambahan Fitur
 
-Dokumen ini berisi ringkasan perubahan dan penambahan fitur yang telah dilakukan untuk memenuhi permintaan pengguna.
+Dokumen ini berisi ringkasan perubahan dan penambahan fitur yang telah dilakukan untuk memenuhi permintaan pengguna. Dokumen ini diperbarui secara berkala untuk mencerminkan status terkini dari aplikasi.
 
 ## 1. Fitur Reply Comment (Balasan Komentar)
 
@@ -47,6 +47,7 @@ Pengelolaan media di Cloudinary telah ditingkatkan untuk memastikan sinkronisasi
 ### Fitur Pengelolaan Media
 
 - **Penghapusan Otomatis**: Media di Cloudinary akan otomatis dihapus saat:
+
   - Post dihapus
   - Post diperbarui dengan media baru
   - Story dihapus
@@ -92,6 +93,41 @@ Batasan dan konfigurasi telah diperbarui:
 - Ukuran maksimum upload video: 100MB
 - Ukuran maksimum upload story (gambar/video): 5MB
 
+## 4. Fitur Edit Post dan Pembatasan Akses
+
+Fitur edit post telah ditambahkan dengan pembatasan akses yang memastikan hanya pemilik post yang dapat mengedit atau menghapus post mereka.
+
+### Pembatasan Akses
+
+- Tombol edit dan delete hanya muncul untuk pemilik post
+- Validasi di backend untuk memastikan hanya pemilik yang dapat melakukan operasi edit/delete
+- Penanganan error yang jelas jika pengguna mencoba mengedit/menghapus post orang lain
+
+### Optimasi UI
+
+- UI optimistik untuk edit post
+- Penghapusan logging debug yang tidak diperlukan
+- Perbaikan alur kerja edit post
+
+## 5. Perbaikan Pengelolaan Media di Cloudinary
+
+Pengelolaan media di Cloudinary telah ditingkatkan untuk memastikan sinkronisasi yang baik antara aplikasi dan penyimpanan cloud:
+
+### Perbaikan Pengelolaan Media
+
+- Penghapusan otomatis foto profil lama saat diperbarui
+- Penghapusan otomatis foto sampul lama saat diperbarui
+- Refaktor kode untuk menggunakan utilitas bersama untuk ekstraksi ID Cloudinary
+- Pembuatan file utilitas `cloudinaryUtils.js` untuk fungsi-fungsi terkait Cloudinary
+
+### Optimasi Kode
+
+- Penggunaan fungsi `extractPublicIdFromUrl` yang konsisten di semua controller
+- Penanganan error yang lebih baik saat operasi Cloudinary gagal
+- Logging yang lebih informatif untuk debugging
+
 ## Kesimpulan
 
-Dengan penambahan fitur reply comment, dukungan format WebP, dan peningkatan pengelolaan media di Cloudinary, aplikasi media sosial ini sekarang memiliki fungsionalitas yang lebih lengkap dan efisien. Pengguna dapat berinteraksi lebih baik melalui balasan komentar, menikmati performa yang lebih baik dengan format WebP, dan tidak perlu khawatir tentang pengelolaan media karena semua dilakukan secara otomatis.
+Dengan penambahan fitur reply comment, dukungan format WebP, peningkatan pengelolaan media di Cloudinary, fitur edit post dengan pembatasan akses, dan perbaikan pengelolaan media, aplikasi media sosial ini sekarang memiliki fungsionalitas yang lebih lengkap, aman, dan efisien.
+
+Pengguna dapat berinteraksi lebih baik melalui balasan komentar, mengedit post mereka sendiri dengan aman, menikmati performa yang lebih baik dengan format WebP, dan tidak perlu khawatir tentang pengelolaan media karena semua dilakukan secara otomatis dengan penanganan yang lebih baik untuk siklus hidup media.

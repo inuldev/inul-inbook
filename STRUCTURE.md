@@ -1,5 +1,7 @@
 # Struktur Aplikasi Social Media
 
+Dokumen ini menjelaskan struktur aplikasi social media yang telah dibangun. Struktur ini dirancang untuk memudahkan pengembangan, pemeliharaan, dan skalabilitas aplikasi.
+
 ## Frontend (Next.js 14)
 
 ```
@@ -146,6 +148,9 @@ backend/
 │   ├── postController.js    # Controller post
 │   ├── storyController.js   # Controller story
 │   └── userController.js    # Controller pengguna
+├── cron/                    # Cron jobs
+│   ├── index.js             # Inisialisasi cron jobs
+│   └── storyCleanup.js      # Pembersihan story yang kedaluwarsa
 ├── middleware/              # Middleware
 │   ├── auth.js              # Middleware autentikasi
 │   └── upload.js            # Middleware upload
@@ -164,6 +169,8 @@ backend/
 │   └── userRoutes.js        # Routes pengguna
 ├── scripts/                 # Script utilitas
 │   └── switch-env.js        # Script untuk switch environment
+├── utils/                   # Utilitas
+│   └── cloudinaryUtils.js   # Utilitas untuk Cloudinary
 ├── .env                     # Environment variables
 ├── .env.production          # Environment variables produksi
 ├── .env.production.example  # Contoh environment variables produksi
@@ -173,3 +180,41 @@ backend/
 ├── test-password.js         # Script test password
 └── vercel.json              # Konfigurasi Vercel
 ```
+
+## Fitur Utama dan Implementasinya
+
+### 1. Autentikasi dan Otorisasi
+
+- **JWT Authentication**: Implementasi di `authController.js` dan `auth.js`
+- **Google OAuth**: Integrasi di `passport.js` dan `authRoutes.js`
+- **Middleware Proteksi**: Implementasi di `auth.js` untuk melindungi rute
+
+### 2. Manajemen Post
+
+- **CRUD Post**: Implementasi di `postController.js`
+- **Interaksi Post**: Like, comment, share di `postController.js`
+- **Media Post**: Upload dan manajemen media di `upload.js` dan `postController.js`
+
+### 3. Manajemen Story
+
+- **CRUD Story**: Implementasi di `storyController.js`
+- **Pembersihan Otomatis**: Cron job di `storyCleanup.js`
+- **View Tracking**: Implementasi di `storyController.js`
+
+### 4. Manajemen Media
+
+- **Cloudinary Integration**: Konfigurasi di `upload.js`
+- **Direct Upload**: Implementasi di `postController.js` dan `storyController.js`
+- **Media Cleanup**: Implementasi di `postController.js`, `storyController.js`, dan `userController.js`
+
+### 5. Manajemen Pengguna
+
+- **Profil Pengguna**: Implementasi di `userController.js`
+- **Follow/Unfollow**: Implementasi di `userController.js`
+- **Pencarian Pengguna**: Implementasi di `userController.js`
+
+### 6. Pertemanan
+
+- **Permintaan Pertemanan**: Implementasi di `friendController.js`
+- **Teman Bersama**: Implementasi di `friendController.js`
+- **Saran Teman**: Implementasi di `friendController.js`

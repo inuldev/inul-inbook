@@ -1,4 +1,9 @@
-# ✨ Aplikasi Media Sosial ✨
+<h1 align="center">✨ Aplikasi Media Sosial ✨</h1>
+
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README-ID.md">Bahasa Indonesia</a>
+</p>
 
 Proyek ini adalah aplikasi media sosial lengkap mirip dengan Facebook yang memungkinkan pengguna untuk berbagi pemikiran, pengalaman, dan media dengan orang lain. Aplikasi ini dibangun dengan teknologi modern, termasuk Next.js 14, Tailwind CSS, Shadcn/UI, dan Zustand untuk manajemen state di frontend, serta Node.js/Express.js dengan MongoDB di backend.
 
@@ -281,6 +286,9 @@ Aplikasi memiliki perilaku berbeda berdasarkan lingkungan:
 - **Zustand**: Manajemen state ringan dengan penyimpanan persisten
 - **Desain Responsif**: Antarmuka mobile-friendly yang berfungsi di semua perangkat
 - **Komponen BaseCard**: Komponen card standar untuk UI yang konsisten di seluruh aplikasi
+- **UI Optimistik**: Umpan balik langsung untuk tindakan pengguna dengan sinkronisasi latar belakang
+- **Dukungan WebP**: Format gambar modern untuk performa dan kualitas lebih baik
+- **Komponen Image Next.js**: Loading dan rendering gambar yang dioptimalkan
 
 ### Fitur Backend
 
@@ -289,6 +297,8 @@ Aplikasi memiliki perilaku berbeda berdasarkan lingkungan:
 - **Autentikasi JWT**: Autentikasi aman dengan sesi berbasis token
 - **Google OAuth**: Integrasi login sosial
 - **Integrasi Cloudinary**: Penyimpanan media berbasis cloud dengan dukungan upload langsung
+- **Cron Jobs**: Tugas otomatis untuk pemeliharaan (misalnya, pembersihan story kedaluwarsa)
+- **Manajemen Media**: Pembersihan otomatis file media yang tidak digunakan
 
 ### Fitur Utama
 
@@ -298,33 +308,52 @@ Aplikasi memiliki perilaku berbeda berdasarkan lingkungan:
    - Integrasi Google OAuth
    - Kustomisasi profil dengan bio, foto profil, dan foto sampul
    - Sistem follow/unfollow
+   - Tampilan teman bersama
+   - Saran teman
 
 2. **Post dan Konten**:
 
-   - Buat post teks dengan pengaturan privasi
-   - Upload gambar (JPG, PNG, GIF, WebP hingga 10MB) dan video (hingga 100MB)
-   - Fungsionalitas like, komentar, dan balasan komentar
-   - Pengelolaan media otomatis di Cloudinary (penghapusan saat post dihapus/diperbarui)
+   - Membuat post teks dengan pengaturan privasi (publik, teman, pribadi)
+   - Upload gambar (hingga 10MB) dan video (hingga 100MB)
+   - Edit dan hapus post
+   - Fungsi like, komentar, dan berbagi
+   - Balas komentar
+   - Edit dan hapus komentar
    - Feed dengan post dari pengguna yang diikuti
+   - Feed video khusus
 
 3. **Stories**:
 
-   - Buat konten sementara yang kedaluwarsa setelah 24 jam
-   - Dukungan untuk gambar (JPG, PNG, GIF, WebP) dan video (hingga 5MB)
-   - Pengelolaan media otomatis di Cloudinary (penghapusan saat story dihapus/kedaluwarsa)
+   - Membuat konten sementara yang kedaluwarsa setelah 24 jam
+   - Dukungan untuk gambar dan video (hingga 5MB)
    - Pelacakan jumlah tampilan
+   - Pembersihan otomatis story yang kedaluwarsa
 
 4. **Antarmuka Pengguna**:
 
    - Dukungan tema gelap/terang
    - Desain responsif untuk mobile dan desktop
-   - Update real-time untuk like dan komentar
+   - Update UI optimistik untuk like, komentar, dan interaksi lainnya
    - Infinite scrolling untuk feed konten
+   - Notifikasi toast untuk umpan balik pengguna
+   - Status loading dan skeleton untuk UX yang lebih baik
+   - Fungsi tampilkan lebih banyak/sedikit untuk komentar dan balasan
 
 5. **Profil dan Penemuan**:
+
    - Profil pengguna detail dengan informasi bio
-   - Fungsionalitas pencarian pengguna
+   - Profil yang dapat disesuaikan dengan pendidikan, pekerjaan, dan detail pribadi
+   - Fungsi pencarian pengguna
    - Manajemen teman/pengikut
+   - Upload dan manajemen foto profil dan sampul
+
+6. **Manajemen Media**:
+
+   - Dukungan untuk berbagai format gambar termasuk WebP
+   - Upload dan pemutaran video
+   - Pembersihan media otomatis saat konten dihapus atau diperbarui
+   - Validasi ukuran dan optimasi
+   - Upload langsung ke Cloudinary untuk performa lebih baik
 
 ## 🔧 Troubleshooting
 
@@ -398,9 +427,9 @@ frontend/
 Kontribusi sangat diterima! Silakan kirimkan Pull Request.
 
 1. Fork repositori
-2. Buat branch fitur Anda (`git checkout -b feature/fitur-keren`)
-3. Commit perubahan Anda (`git commit -m 'Menambahkan fitur keren'`)
-4. Push ke branch (`git push origin feature/fitur-keren`)
+2. Buat branch fitur Anda (`git checkout -b feature/fitur-luar-biasa`)
+3. Commit perubahan Anda (`git commit -m 'Menambahkan fitur luar biasa'`)
+4. Push ke branch (`git push origin feature/fitur-luar-biasa`)
 5. Buka Pull Request
 
 ## 💾 Lisensi
@@ -409,6 +438,24 @@ Proyek ini dilisensikan di bawah Lisensi MIT - lihat file LICENSE untuk detail.
 
 ## 👋 Kesimpulan
 
-Aplikasi media sosial ini menyediakan fondasi yang solid untuk membangun platform mirip Facebook. Aplikasi ini mencakup semua fitur penting seperti autentikasi, post, story, dan interaksi pengguna. Aplikasi telah direfaktor untuk menggunakan struktur yang lebih modular dan mudah dipelihara, dengan komponen standar dan implementasi yang konsisten di seluruh codebase.
+Aplikasi media sosial ini menyediakan fondasi komprehensif untuk membangun platform mirip Facebook. Aplikasi ini mencakup semua fitur penting yang diharapkan dari aplikasi media sosial modern, termasuk autentikasi, post, stories, komentar, profil pengguna, dan manajemen media.
+
+### Pencapaian
+
+- **Set Fitur Komprehensif**: Aplikasi ini mencakup semua fitur inti media sosial dan banyak fitur lanjutan
+- **Performa Dioptimalkan**: Perhatian cermat terhadap performa dengan update UI optimistik dan penanganan media yang efisien
+- **Arsitektur Kuat**: Pemisahan kepentingan yang bersih dengan komponen dan layanan modular
+- **Manajemen Media**: Manajemen siklus hidup media lengkap dengan integrasi Cloudinary
+- **Pengalaman Pengguna**: Fokus pada desain responsif dan interaksi intuitif
+
+### Peningkatan Masa Depan
+
+Meskipun aplikasi ini sudah kaya fitur, ada beberapa peningkatan potensial untuk pengembangan masa depan:
+
+- **Pesan Real-time**: Implementasi sistem chat (memerlukan solusi hosting selain paket hobby Vercel)
+- **Notifikasi Real-time**: Notifikasi push untuk interaksi pengguna
+- **Aplikasi Mobile**: Aplikasi mobile native menggunakan React Native
+- **Dashboard Analitik**: Metrik keterlibatan pengguna dan performa konten
+- **Moderasi Konten**: Alat pemfilteran dan moderasi konten berbasis AI
 
 Untuk pertanyaan atau masalah, silakan buka issue di repositori GitHub.
