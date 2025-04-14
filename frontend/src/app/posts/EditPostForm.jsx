@@ -3,7 +3,16 @@
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import React, { useState, useEffect } from "react";
-import { ImageIcon, Laugh, X, AlertCircle, Loader2 } from "lucide-react";
+import {
+  ImageIcon,
+  Laugh,
+  X,
+  AlertCircle,
+  Loader2,
+  Globe,
+  Users,
+  Lock,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +30,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 
 import userStore from "@/store/userStore";
@@ -148,13 +156,56 @@ const EditPostForm = ({ isOpen, onClose, post }) => {
             <div>
               <p className="font-semibold">{user?.username || "User"}</p>
               <Select value={privacy} onValueChange={setPrivacy}>
-                <SelectTrigger className="h-8 w-[120px]">
-                  <SelectValue placeholder="Privacy" />
+                <SelectTrigger className="h-8 w-[150px] px-3 text-left justify-start">
+                  <div className="flex items-center space-x-2 overflow-hidden">
+                    {privacy === "public" && (
+                      <Globe className="h-4 w-4 flex-shrink-0" />
+                    )}
+                    {privacy === "friends" && (
+                      <Users className="h-4 w-4 flex-shrink-0" />
+                    )}
+                    {privacy === "private" && (
+                      <Lock className="h-4 w-4 flex-shrink-0" />
+                    )}
+                    <span className="truncate">
+                      {privacy.charAt(0).toUpperCase() + privacy.slice(1)}
+                    </span>
+                  </div>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="friends">Friends</SelectItem>
-                  <SelectItem value="private">Private</SelectItem>
+                <SelectContent className="w-[280px]">
+                  <SelectItem value="public">
+                    <div className="flex items-center w-full">
+                      <Globe className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                      <div className="w-full">
+                        <p className="font-medium">Public</p>
+                        <p className="text-xs text-gray-500 whitespace-normal">
+                          Anyone can see this post
+                        </p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="friends">
+                    <div className="flex items-center w-full">
+                      <Users className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                      <div className="w-full">
+                        <p className="font-medium">Friends</p>
+                        <p className="text-xs text-gray-500 whitespace-normal">
+                          Only your friends can see this post
+                        </p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="private">
+                    <div className="flex items-center w-full">
+                      <Lock className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                      <div className="w-full">
+                        <p className="font-medium">Private</p>
+                        <p className="text-xs text-gray-500 whitespace-normal">
+                          Only you can see this post
+                        </p>
+                      </div>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

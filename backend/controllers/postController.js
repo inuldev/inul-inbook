@@ -65,8 +65,72 @@ const getPosts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
+    let query = {};
+
+    // Check if user is logged in
+    if (req.user && req.user.id) {
+      console.log(`[${req.path}] User is logged in with ID: ${req.user.id}`);
+
+      try {
+        // Get current user
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+          console.error(`User with ID ${req.user.id} not found in database`);
+          // Fall back to public posts only
+          query = { privacy: "public" };
+          console.log("User not found in database, showing public posts only");
+        } else {
+          // Get users who follow the current user (for "friends" privacy)
+          const followers = await User.find({ following: req.user.id }).select(
+            "_id"
+          );
+          const followerIds = followers.map((follower) => follower._id);
+
+          console.log(
+            `User ${req.user.id} is followed by ${followerIds.length} users`
+          );
+          console.log(
+            `User ${req.user.id} follows ${user.following?.length || 0} users`
+          );
+
+          query = {
+            $or: [
+              // All posts from the current user
+              { user: req.user.id },
+              // Public posts from anyone
+              { privacy: "public" },
+              // Friends-only posts from followed users
+              {
+                user: { $in: user.following || [] },
+                privacy: "friends",
+              },
+              // Friends-only posts from users who follow the current user
+              {
+                user: { $in: followerIds },
+                privacy: "friends",
+              },
+            ],
+          };
+
+          console.log(
+            `[${req.path}] Getting posts for logged-in user ${req.user.id} with privacy filtering`
+          );
+        }
+      } catch (userError) {
+        console.error(`Error fetching user data: ${userError.message}`);
+        // Fall back to public posts only
+        query = { privacy: "public" };
+        console.log("Error fetching user data, showing public posts only");
+      }
+    } else {
+      // If user is not logged in, only show public posts
+      query = { privacy: "public" };
+      console.log(`[${req.path}] Getting public posts for non-logged-in user`);
+    }
+
     // Get posts
-    const posts = await Post.find({ privacy: "public" })
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -76,7 +140,9 @@ const getPosts = async (req, res) => {
       });
 
     // Get total count
-    const total = await Post.countDocuments({ privacy: "public" });
+    const total = await Post.countDocuments(query);
+
+    console.log(`Found ${posts.length} posts (page ${page}, total: ${total})`);
 
     res.status(200).json({
       success: true,
@@ -89,6 +155,7 @@ const getPosts = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Error getting posts:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -109,10 +176,47 @@ const getFeedPosts = async (req, res) => {
     // Get current user
     const user = await User.findById(req.user.id);
 
-    // Get posts from followed users and own posts
-    const posts = await Post.find({
-      $or: [{ user: { $in: user.following } }, { user: req.user.id }],
-    })
+    // Get users who follow the current user (for "friends" privacy)
+    const followers = await User.find({ following: req.user.id }).select("_id");
+    const followerIds = followers.map((follower) => follower._id);
+
+    console.log(
+      `User ${req.user.id} is followed by ${followerIds.length} users`
+    );
+
+    // Build query to get:
+    // 1. All posts from the current user (regardless of privacy)
+    // 2. Public posts from followed users
+    // 3. Friends-only posts from followed users
+    // 4. Friends-only posts from users who follow the current user
+    const query = {
+      $or: [
+        // All posts from the current user
+        { user: req.user.id },
+        // Public posts from followed users
+        {
+          user: { $in: user.following },
+          privacy: "public",
+        },
+        // Friends-only posts from followed users
+        {
+          user: { $in: user.following },
+          privacy: "friends",
+        },
+        // Friends-only posts from users who follow the current user
+        {
+          user: { $in: followerIds },
+          privacy: "friends",
+        },
+      ],
+    };
+
+    console.log(
+      `Getting feed posts for user ${req.user.id} with privacy filtering`
+    );
+
+    // Get posts with the improved query
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -121,10 +225,12 @@ const getFeedPosts = async (req, res) => {
         select: "username profilePicture",
       });
 
-    // Get total count
-    const total = await Post.countDocuments({
-      $or: [{ user: { $in: user.following } }, { user: req.user.id }],
-    });
+    // Get total count with the same query
+    const total = await Post.countDocuments(query);
+
+    console.log(
+      `Found ${posts.length} posts for feed (page ${page}, total: ${total})`
+    );
 
     res.status(200).json({
       success: true,
@@ -137,6 +243,7 @@ const getFeedPosts = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Error getting feed posts:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -169,16 +276,60 @@ const getPost = async (req, res) => {
       });
     }
 
-    // Check if post is private and user is not the owner
-    if (
-      post.privacy === "private" &&
-      (!req.user || post.user._id.toString() !== req.user.id)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to access this post",
-      });
+    // Check privacy settings
+    // 1. If post is private, only the owner can see it
+    if (post.privacy === "private") {
+      if (!req.user || post.user._id.toString() !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this post",
+        });
+      }
     }
+    // 2. If post is for friends only, only the owner and followers can see it
+    else if (post.privacy === "friends") {
+      if (!req.user) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this post",
+        });
+      }
+
+      // If not the owner, check if the user follows the post owner
+      if (post.user._id.toString() !== req.user.id) {
+        // Check if the current user follows the post owner
+        const isFollowing = await User.findOne({
+          _id: req.user.id,
+          following: post.user._id,
+        });
+
+        // Check if the post owner follows the current user
+        const isFollowed = await User.findOne({
+          _id: post.user._id,
+          following: req.user.id,
+        });
+
+        // For "friends" privacy, either following relationship is sufficient
+        if (!isFollowing && !isFollowed) {
+          console.log(
+            `User ${req.user.id} cannot access post ${post._id} with privacy "friends" - no following relationship`
+          );
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to access this post",
+          });
+        }
+
+        console.log(
+          `User ${req.user.id} can access post ${post._id} with privacy "friends" - following relationship exists`
+        );
+      }
+    }
+    // 3. If post is public, anyone can see it (no additional checks needed)
+
+    console.log(
+      `Privacy check passed for post ${req.params.id} with privacy ${post.privacy}`
+    );
 
     // Always include comments for consistency
     // Find all comments for this post
@@ -534,16 +685,60 @@ const getPostComments = async (req, res) => {
       });
     }
 
-    // Check if post is private and user is not the owner
-    if (
-      post.privacy === "private" &&
-      (!req.user || post.user.toString() !== req.user.id)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to access this post",
-      });
+    // Check privacy settings
+    // 1. If post is private, only the owner can see it
+    if (post.privacy === "private") {
+      if (!req.user || post.user.toString() !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this post",
+        });
+      }
     }
+    // 2. If post is for friends only, only the owner and followers can see it
+    else if (post.privacy === "friends") {
+      if (!req.user) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this post",
+        });
+      }
+
+      // If not the owner, check if the user follows the post owner OR if the post owner follows the user
+      if (post.user.toString() !== req.user.id) {
+        // Check if the current user follows the post owner
+        const isFollowing = await User.findOne({
+          _id: req.user.id,
+          following: post.user,
+        });
+
+        // Check if the post owner follows the current user
+        const isFollowed = await User.findOne({
+          _id: post.user,
+          following: req.user.id,
+        });
+
+        // For "friends" privacy, either following relationship is sufficient
+        if (!isFollowing && !isFollowed) {
+          console.log(
+            `User ${req.user.id} cannot access comments for post ${post._id} with privacy "friends" - no following relationship`
+          );
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to access this post",
+          });
+        }
+
+        console.log(
+          `User ${req.user.id} can access comments for post ${post._id} with privacy "friends" - following relationship exists`
+        );
+      }
+    }
+    // 3. If post is public, anyone can see it (no additional checks needed)
+
+    console.log(
+      `Privacy check passed for comments on post ${req.params.id} with privacy ${post.privacy}`
+    );
 
     // Get comments
     const comments = await Comment.find({
@@ -571,6 +766,10 @@ const getPostComments = async (req, res) => {
       parentComment: null,
     });
 
+    console.log(
+      `Found ${comments.length} comments for post ${req.params.id} (page ${page}, total: ${total})`
+    );
+
     res.status(200).json({
       success: true,
       data: comments,
@@ -582,6 +781,7 @@ const getPostComments = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error(`Error getting comments for post ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -919,11 +1119,51 @@ const getUserPosts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Get posts
-    const posts = await Post.find({
-      user: req.params.id,
-      privacy: "public",
-    })
+    // Build base query with user ID
+    let query = { user: req.params.id };
+
+    // Add privacy filter based on the relationship
+    if (req.user && req.user.id === req.params.id) {
+      // If the viewer is the post owner, show all posts (no privacy filter needed)
+      console.log(`Getting all posts for user ${req.params.id} (owner view)`);
+    } else if (req.user) {
+      // If the viewer is logged in but not the owner
+      // Check if the viewer follows the post owner
+      const isFollowing = await User.findOne({
+        _id: req.user.id,
+        following: req.params.id,
+      });
+
+      // Check if the post owner follows the viewer
+      const isFollowed = await User.findOne({
+        _id: req.params.id,
+        following: req.user.id,
+      });
+
+      // For "friends" privacy, either following relationship is sufficient
+      if (isFollowing || isFollowed) {
+        // Show public and friends posts
+        query.privacy = { $in: ["public", "friends"] };
+        console.log(
+          `Getting public and friends posts for user ${req.params.id} (following relationship exists)`
+        );
+      } else {
+        // Show only public posts
+        query.privacy = "public";
+        console.log(
+          `Getting public posts for user ${req.params.id} (no following relationship)`
+        );
+      }
+    } else {
+      // If the viewer is not logged in, show only public posts
+      query.privacy = "public";
+      console.log(
+        `Getting public posts for user ${req.params.id} (public view)`
+      );
+    }
+
+    // Get posts with the improved query
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -932,11 +1172,12 @@ const getUserPosts = async (req, res) => {
         select: "username profilePicture",
       });
 
-    // Get total count
-    const total = await Post.countDocuments({
-      user: req.params.id,
-      privacy: "public",
-    });
+    // Get total count with the same query
+    const total = await Post.countDocuments(query);
+
+    console.log(
+      `Found ${posts.length} posts for user ${req.params.id} (page ${page}, total: ${total})`
+    );
 
     res.status(200).json({
       success: true,
@@ -949,6 +1190,7 @@ const getUserPosts = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error(`Error getting posts for user ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: "Server error",

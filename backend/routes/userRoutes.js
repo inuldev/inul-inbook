@@ -17,12 +17,14 @@ const { profileUpload } = require("../middleware/upload");
 
 const router = express.Router();
 
-// Public routes
-router.get("/search", searchUsers);
-router.get("/followers/:id", getUserFollowers);
-router.get("/following/:id", getUserFollowing);
+// Public routes with optional authentication
+// These routes work for both authenticated and non-authenticated users
+// but provide different results based on authentication status
+router.get("/search", protect, searchUsers);
+router.get("/followers/:id", protect, getUserFollowers);
+router.get("/following/:id", protect, getUserFollowing);
 router.get("/mutual-friends/:id", protect, getMutualFriends);
-router.get("/:id", getUserProfile);
+router.get("/:id", protect, getUserProfile);
 
 // Protected routes
 router.put("/profile", protect, updateProfile);

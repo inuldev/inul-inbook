@@ -53,6 +53,7 @@ import usePostStore from "@/store/postStore";
 import useCommentStore from "@/store/commentStore";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import EnhancedCommentSystem from "./EnhancedCommentSystem";
+import PrivacyIndicator from "./PrivacyIndicator";
 import {
   togglePostLike,
   sharePost,
@@ -356,9 +357,12 @@ const BaseCard = ({
                 className="cursor-pointer"
                 onClick={() => router.push(`/user-profile/${post?.user?._id}`)}
               >
-                <p className="font-semibold dark:text-white hover:underline">
-                  {post?.user?.username || "Unknown User"}
-                </p>
+                <div className="flex items-center space-x-2">
+                  <p className="font-semibold dark:text-white hover:underline">
+                    {post?.user?.username || "Unknown User"}
+                  </p>
+                  <PrivacyIndicator privacy={post?.privacy || "public"} />
+                </div>
                 <div className="flex items-center text-gray-500 dark:text-gray-400">
                   <Clock className="h-4 w-4 mr-1" />
                   <span className="text-sm">

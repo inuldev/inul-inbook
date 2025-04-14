@@ -25,11 +25,13 @@ const { postUpload, generateSignature } = require("../middleware/upload");
 
 const router = express.Router();
 
-// Public routes
-router.get("/", getPosts);
-router.get("/user/:id", getUserPosts);
-router.get("/:id", getPost);
-router.get("/:id/comments", getPostComments);
+// Public routes with optional authentication
+// These routes work for both authenticated and non-authenticated users
+// but provide different results based on authentication status
+router.get("/", protect, getPosts);
+router.get("/user/:id", protect, getUserPosts);
+router.get("/:id", protect, getPost);
+router.get("/:id/comments", protect, getPostComments);
 
 // Protected routes
 router.post("/", protect, postUpload.single("media"), createPost);

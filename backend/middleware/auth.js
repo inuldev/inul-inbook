@@ -7,8 +7,12 @@ const protect = async (req, res, next) => {
     let token;
 
     // Log all cookies and headers for debugging
+    console.log("\n=== AUTH MIDDLEWARE DEBUG ====");
     console.log("Auth middleware called for path:", req.path);
     console.log("All cookies in auth middleware:", req.cookies);
+    console.log("Cookie names:", Object.keys(req.cookies || {}));
+    console.log("Has token cookie:", !!req.cookies?.token);
+    console.log("Has dev_token cookie:", !!req.cookies?.dev_token);
     console.log(
       "Authorization header:",
       req.headers.authorization ? "Present" : "Not present"
@@ -16,8 +20,10 @@ const protect = async (req, res, next) => {
     console.log("Request origin:", req.headers.origin);
     console.log("Request host:", req.headers.host);
     console.log("Request referrer:", req.headers.referrer);
+    console.log("Request user agent:", req.headers["user-agent"]);
     console.log("Is production:", process.env.NODE_ENV === "production");
     console.log("Frontend URL:", process.env.FRONTEND_URL);
+    console.log("=== END AUTH MIDDLEWARE DEBUG ===\n");
 
     // Check multiple sources for the token in this order:
     // 1. Cookies (primary method)
@@ -73,11 +79,10 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
-      console.log("No token found in request");
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized to access this route",
-      });
+      console.log("No token found in request - continuing as public user");
+      // Instead of returning 401, just continue without setting req.user
+      // This allows routes to handle both authenticated and non-authenticated users
+      return next();
     }
 
     // Verify token

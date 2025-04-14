@@ -21,6 +21,7 @@ const usePostStore = create((set, get) => ({
   posts: [],
   loading: false,
   error: null,
+  hasLoadedInitially: false, // Track if we've done initial load
   pagination: {
     page: 1,
     limit: 10,
@@ -36,28 +37,45 @@ const usePostStore = create((set, get) => ({
    * @returns {Promise<Array>} - Array of posts
    */
   fetchPosts: async (page = 1, limit = 10, forceRefresh = false) => {
+    // Always check if user is logged in first
+    const currentUser = userStore.getState().user;
+
     // Check if we already have posts and we're not forcing a refresh
+    // BUT always refresh if this is the initial page load
     const existingPosts = get().posts;
-    if (existingPosts.length > 0 && !forceRefresh) {
+    const isInitialLoad = !get().hasLoadedInitially;
+
+    if (existingPosts.length > 0 && !forceRefresh && !isInitialLoad) {
       console.log("Using cached posts");
       return existingPosts;
     }
 
-    // Only set loading to true if we don't have posts yet
-    if (existingPosts.length === 0) {
-      set({ loading: true, error: null });
-    }
+    // Set loading state
+    set({
+      loading: true,
+      error: null,
+      hasLoadedInitially: true, // Mark that we've done initial load
+    });
 
     try {
+      console.log(
+        `Fetching posts: page=${page}, limit=${limit}, forceRefresh=${forceRefresh}`
+      );
+
       const response = await fetch(
-        `${config.backendUrl}/api/posts?page=${page}&limit=${limit}`,
+        `${
+          config.backendUrl
+        }/api/posts?page=${page}&limit=${limit}&_=${Date.now()}`, // Add timestamp to prevent caching
         {
           method: "GET",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
           },
-          cache: forceRefresh ? "no-store" : "default", // Use browser cache unless forcing refresh
+          cache: "no-store", // Never use browser cache
           timeout: config.apiTimeouts.medium,
         }
       );
@@ -1082,6 +1100,7 @@ const usePostStore = create((set, get) => ({
   clearPosts: () => {
     set({
       posts: [],
+      hasLoadedInitially: false, // Reset initial load flag
       pagination: {
         page: 1,
         limit: 10,

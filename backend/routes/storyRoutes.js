@@ -14,10 +14,12 @@ const { storyUpload, generateSignature } = require("../middleware/upload");
 
 const router = express.Router();
 
-// Public routes
-router.get("/", getStories);
-router.get("/user/:id", getUserStories);
-router.get("/:id", getStory);
+// Public routes with optional authentication
+// These routes work for both authenticated and non-authenticated users
+// but provide different results based on authentication status
+router.get("/", protect, getStories);
+router.get("/user/:id", protect, getUserStories);
+router.get("/:id", protect, getStory);
 
 // Protected routes
 router.post("/", protect, storyUpload.single("media"), createStory);

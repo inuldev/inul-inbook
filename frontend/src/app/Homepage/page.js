@@ -25,11 +25,28 @@ const HomePage = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  // Add a ref to track if this is the first render
+  const isFirstRender = React.useRef(true);
+
   useEffect(() => {
-    // If user is logged in, fetch feed posts, otherwise fetch public posts
-    // Only force refresh when refreshTrigger changes
-    const forceRefresh = refreshTrigger > 0;
+    // Always force refresh on first render or when refresh is triggered
+    const forceRefresh = isFirstRender.current || refreshTrigger > 0;
+
+    // Log the refresh state
+    console.log(
+      `Fetching posts - forceRefresh: ${forceRefresh}, isFirstRender: ${isFirstRender.current}`
+    );
+
+    // Fetch posts
     fetchPosts(1, 10, forceRefresh);
+
+    // Set first render to false after the first render
+    isFirstRender.current = false;
+
+    // Add cleanup function to reset first render flag when component unmounts
+    return () => {
+      isFirstRender.current = true;
+    };
   }, [fetchPosts, user, refreshTrigger]);
 
   return (

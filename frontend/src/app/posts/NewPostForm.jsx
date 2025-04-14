@@ -2,7 +2,16 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import React, { useState } from "react";
-import { ImageIcon, Video, Laugh, X, AlertCircle } from "lucide-react";
+import {
+  ImageIcon,
+  Video,
+  Laugh,
+  X,
+  AlertCircle,
+  Globe,
+  Users,
+  Lock,
+} from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +32,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 
 import usePostStore from "@/store/postStore";
@@ -154,13 +162,56 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                   </div>
                 </div>
                 <Select value={privacy} onValueChange={setPrivacy}>
-                  <SelectTrigger className="w-[130px]">
-                    <SelectValue placeholder="Privacy" />
+                  <SelectTrigger className="w-[150px] h-9 px-3 text-left justify-start">
+                    <div className="flex items-center space-x-2 overflow-hidden">
+                      {privacy === "public" && (
+                        <Globe className="h-4 w-4 flex-shrink-0" />
+                      )}
+                      {privacy === "friends" && (
+                        <Users className="h-4 w-4 flex-shrink-0" />
+                      )}
+                      {privacy === "private" && (
+                        <Lock className="h-4 w-4 flex-shrink-0" />
+                      )}
+                      <span className="truncate">
+                        {privacy.charAt(0).toUpperCase() + privacy.slice(1)}
+                      </span>
+                    </div>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="friends">Friends</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
+                  <SelectContent className="w-[280px]">
+                    <SelectItem value="public">
+                      <div className="flex items-center w-full">
+                        <Globe className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                        <div className="w-full">
+                          <p className="font-medium">Public</p>
+                          <p className="text-xs text-gray-500 whitespace-normal">
+                            Anyone can see this post
+                          </p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="friends">
+                      <div className="flex items-center w-full">
+                        <Users className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                        <div className="w-full">
+                          <p className="font-medium">Friends</p>
+                          <p className="text-xs text-gray-500 whitespace-normal">
+                            Only your friends can see this post
+                          </p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="private">
+                      <div className="flex items-center w-full">
+                        <Lock className="h-4 w-4 mr-2 text-gray-500 flex-shrink-0" />
+                        <div className="w-full">
+                          <p className="font-medium">Private</p>
+                          <p className="text-xs text-gray-500 whitespace-normal">
+                            Only you can see this post
+                          </p>
+                        </div>
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -179,17 +230,6 @@ const NewPostForm = ({ isPostFormOpen, setIsPostFormOpen }) => {
                   <span>{postError}</span>
                 </div>
               )}
-
-              {/* {!showMediaUploader && !mediaData && (
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full"
-                  onClick={() => setShowMediaUploader(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Photos/Videos
-                </Button>
-              )} */}
 
               {showMediaUploader && !mediaData && (
                 <div className="mt-4">
