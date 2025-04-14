@@ -420,10 +420,13 @@ export async function clearAllAuthData() {
       }
     }
 
-    // 4. Clear cookies with multiple approaches
+    // 4. Clear cookies with our improved deleteCookie function
     if (isCookiesAvailable()) {
       try {
-        // Daftar semua cookie yang mungkin digunakan untuk autentikasi
+        // Import the deleteCookie function dynamically to avoid circular dependencies
+        const { deleteCookie } = await import("@/lib/cookieUtils");
+
+        // List of all cookies that might be used for authentication
         const cookiesToClear = [
           "token",
           "auth_status",
@@ -435,28 +438,48 @@ export async function clearAllAuthData() {
           "session_id",
         ];
 
-        // Hapus dengan berbagai kombinasi pengaturan
-        cookiesToClear.forEach((cookieName) => {
-          // Metode 1: Hapus dengan path=/ (standar)
-          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        // Get domain information for thorough cookie deletion
+        const hostname = window.location.hostname;
+        const isSecure = window.location.protocol === "https:";
+        const isProduction =
+          process.env.NODE_ENV === "production" || hostname !== "localhost";
 
-          // Metode 2: Hapus dengan Secure dan SameSite=None untuk produksi
-          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=None`;
+        // Try to get root domain for subdomain cookies
+        let rootDomain = null;
+        try {
+          const domainParts = hostname.split(".");
+          if (domainParts.length > 2) {
+            rootDomain = "." + domainParts.slice(-2).join(".");
+          }
+        } catch (e) {
+          console.error("Error determining root domain:", e);
+        }
 
-          // Metode 3: Hapus dengan SameSite=Lax untuk development
-          document.cookie = `${cookieName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+        console.log(
+          `Clearing cookies with hostname: ${hostname}, rootDomain: ${rootDomain}, isProduction: ${isProduction}`
+        );
 
-          // Metode 4: Hapus dengan domain (untuk subdomain sharing)
-          try {
-            const domain = window.location.hostname
-              .split(".")
-              .slice(-2)
-              .join(".");
-            document.cookie = `${cookieName}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-          } catch (e) {}
-        });
+        // Delete each cookie with our improved function
+        for (const cookieName of cookiesToClear) {
+          // First try with standard options
+          await deleteCookie(cookieName, {
+            secure: isSecure,
+            sameSite: isProduction ? "none" : "lax",
+            tryAllMethods: true,
+          });
 
-        // Verifikasi apakah cookies benar-benar dihapus
+          // If we have a root domain, also try with that
+          if (rootDomain) {
+            await deleteCookie(cookieName, {
+              secure: isSecure,
+              sameSite: isProduction ? "none" : "lax",
+              domain: rootDomain,
+              tryAllMethods: true,
+            });
+          }
+        }
+
+        // Verify if cookies were actually deleted
         setTimeout(() => {
           const remainingCookies = document.cookie.split("; ");
           const authCookiesRemaining = cookiesToClear.filter((name) =>
@@ -465,19 +488,29 @@ export async function clearAllAuthData() {
 
           if (authCookiesRemaining.length > 0) {
             console.warn(
-              "Some auth cookies could not be cleared:",
+              "⚠️ Some auth cookies could not be cleared:",
               authCookiesRemaining
             );
 
-            // Coba sekali lagi dengan metode yang lebih agresif
-            authCookiesRemaining.forEach((cookieName) => {
-              // Coba dengan path yang berbeda
-              ["/", "", "/api", "/auth"].forEach((path) => {
-                document.cookie = `${cookieName}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-              });
+            // Try one more time with more aggressive options
+            authCookiesRemaining.forEach(async (cookieName) => {
+              try {
+                // Try with explicit domain and all possible paths
+                await deleteCookie(cookieName, {
+                  secure: true,
+                  sameSite: "none",
+                  domain: hostname,
+                  tryAllMethods: true,
+                });
+              } catch (e) {
+                console.error(
+                  `Final attempt to clear ${cookieName} failed:`,
+                  e
+                );
+              }
             });
           } else {
-            console.log("All auth cookies successfully cleared");
+            console.log("✅ All auth cookies successfully cleared");
           }
         }, 100);
 

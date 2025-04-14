@@ -487,6 +487,10 @@ const userStore = create((set, get) => ({
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          // Add cache control headers to prevent caching
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
         timeout: config.apiTimeouts.short,
       });
@@ -496,6 +500,47 @@ const userStore = create((set, get) => ({
       }
 
       console.log("Logout successful, all auth data cleared");
+
+      // Verify that cookies are actually cleared before redirecting
+      const cookiesToCheck = [
+        "token",
+        "auth_status",
+        "dev_token",
+        "dev_auth_status",
+      ];
+      const remainingCookies = document.cookie.split("; ");
+      const authCookiesRemaining = cookiesToCheck.filter((name) =>
+        remainingCookies.some((c) => c.startsWith(`${name}=`))
+      );
+
+      if (authCookiesRemaining.length > 0) {
+        console.warn(
+          "⚠️ Some auth cookies still remain after logout:",
+          authCookiesRemaining
+        );
+
+        // Try one more time to clear cookies directly
+        try {
+          const { deleteCookie } = await import("@/lib/cookieUtils");
+
+          for (const cookieName of authCookiesRemaining) {
+            await deleteCookie(cookieName, {
+              secure: window.location.protocol === "https:",
+              sameSite: "none",
+              tryAllMethods: true,
+            });
+          }
+
+          console.log("Additional cookie cleanup completed");
+        } catch (e) {
+          console.error("Error in additional cookie cleanup:", e);
+        }
+      } else {
+        console.log("✅ All auth cookies successfully cleared");
+      }
+
+      // Return true to indicate successful logout
+      return true;
     } catch (error) {
       console.error("Error during logout process:", error);
       set({ error: error.message });
@@ -503,8 +548,13 @@ const userStore = create((set, get) => ({
       // Make sure we still clear everything even if the API call fails
       try {
         await clearAllAuthData();
+
+        // Even if the API call fails, we should still consider the logout successful
+        // if we've cleared all client-side data
+        return true;
       } catch (clearError) {
         console.error("Error in final cleanup attempt:", clearError);
+        return false;
       }
     }
   },

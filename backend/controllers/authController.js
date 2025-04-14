@@ -165,6 +165,17 @@ const logout = (req, res) => {
       "refresh_token",
     ];
 
+    // Get the domain from the request for more accurate cookie clearing
+    const hostname = req.headers.host || "";
+    const domain = hostname.includes(".") ? hostname.split(":")[0] : null;
+
+    // Log domain information for debugging
+    console.log(
+      `Logout request from host: ${hostname}, using domain: ${domain || "none"}`
+    );
+    console.log(`Request origin: ${req.headers.origin || "none"}`);
+    console.log(`Frontend URL: ${config.frontendUrl}`);
+
     // Prepare base cookie options
     const baseCookieOptions = {
       httpOnly: true,
@@ -189,58 +200,73 @@ const logout = (req, res) => {
       ? productionOptions
       : developmentOptions;
 
+    // Add Cache-Control headers to prevent caching of the response
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+
     // Clear each cookie with multiple methods
     cookiesToClear.forEach((cookieName) => {
-      // Method 1: Set to 'none' with short expiry
-      res.cookie(cookieName, "none", {
-        ...cookieOptions,
-        expires: new Date(Date.now() + 1000), // 1 second
-      });
-
-      // Method 2: Set empty value with expired date
+      // Method 1: Standard approach with path=/
       res.cookie(cookieName, "", {
         ...cookieOptions,
         expires: new Date(0),
+        maxAge: 0,
       });
 
-      // Method 3: Try with different path
-      res.cookie(cookieName, "", {
-        ...cookieOptions,
-        path: "",
-        expires: new Date(0),
+      // Method 2: With domain if available
+      if (domain) {
+        res.cookie(cookieName, "", {
+          ...cookieOptions,
+          domain,
+          expires: new Date(0),
+          maxAge: 0,
+        });
+      }
+
+      // Method 3: With root domain if it's a subdomain
+      if (domain && domain.split(".").length > 2) {
+        const rootDomain = domain.split(".").slice(-2).join(".");
+        res.cookie(cookieName, "", {
+          ...cookieOptions,
+          domain: `.${rootDomain}`,
+          expires: new Date(0),
+          maxAge: 0,
+        });
+      }
+
+      // Method 4: With alternative SameSite settings
+      ["none", "lax", "strict"].forEach((sameSiteValue) => {
+        // Skip none without secure
+        if (sameSiteValue === "none" && !cookieOptions.secure) return;
+
+        res.cookie(cookieName, "", {
+          ...baseCookieOptions,
+          sameSite: sameSiteValue,
+          secure: sameSiteValue === "none" ? true : cookieOptions.secure,
+          expires: new Date(0),
+          maxAge: 0,
+        });
       });
 
       // Log each cookie clearing attempt
-      console.log(`Attempted to clear cookie: ${cookieName}`);
+      console.log(
+        `Attempted to clear cookie: ${cookieName} with multiple approaches`
+      );
     });
-
-    // Also try clearing with alternative settings
-    if (config.isProduction) {
-      // In production, also try with lax setting as fallback
-      cookiesToClear.forEach((cookieName) => {
-        res.cookie(cookieName, "", {
-          ...baseCookieOptions,
-          sameSite: "lax",
-          expires: new Date(0),
-        });
-      });
-    } else {
-      // In development, also try with none setting as fallback
-      cookiesToClear.forEach((cookieName) => {
-        res.cookie(cookieName, "", {
-          ...baseCookieOptions,
-          sameSite: "none",
-          secure: true,
-          expires: new Date(0),
-        });
-      });
-    }
 
     console.log("Logout successful, all cookies cleared");
 
+    // Return a successful response with clear instructions for the client
     res.status(200).json({
       success: true,
       message: "User logged out successfully",
+      clearClientStorage: true, // Signal to client to also clear local/session storage
+      redirectTo: "/user-login", // Suggest redirect location
     });
   } catch (error) {
     console.error("Logout error:", error);

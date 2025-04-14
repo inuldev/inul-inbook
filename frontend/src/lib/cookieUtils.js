@@ -103,81 +103,130 @@ export function getCookie(name) {
  * @param {string} options.path - Cookie path
  * @param {boolean} options.secure - Whether the cookie should be secure
  * @param {string} options.sameSite - SameSite attribute (strict, lax, none)
+ * @param {string} options.domain - Cookie domain
+ * @param {boolean} options.tryAllMethods - Try all possible methods to delete the cookie
  */
 export function deleteCookie(name, options = {}) {
   const {
     path = "/",
     secure = window.location.protocol === "https:",
     sameSite = "lax",
-    domain = undefined, // Tambahkan opsi domain
+    domain = undefined,
+    tryAllMethods = true, // Default to trying all methods
   } = options;
 
-  // Menentukan apakah kita berada di lingkungan produksi atau pengembangan
+  // Determine if we're in production or development
   const isProduction =
     process.env.NODE_ENV === "production" ||
     window.location.hostname !== "localhost";
 
-  // Di produksi, default ke sameSite=none untuk kompatibilitas lintas domain
-  const effectiveSameSite =
-    isProduction && secure ? sameSite || "none" : sameSite;
+  // In production, default to sameSite=none for cross-domain compatibility
+  const effectiveSameSite = isProduction && secure ? "none" : sameSite;
 
   try {
-    // Coba hapus dengan berbagai kombinasi pengaturan untuk memastikan cookie benar-benar dihapus
+    console.log(
+      `Attempting to delete cookie: ${name} (production: ${isProduction})`
+    );
 
-    // 1. Hapus dengan pengaturan dasar
-    document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    // Get the hostname for domain-based deletion
+    const hostname = window.location.hostname;
+    // Get domain parts for trying domain and subdomains
+    const domainParts = hostname.split(".");
 
-    // 2. Hapus dengan secure dan samesite
-    let cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    // Basic deletion approaches that work in most cases
+    const basicDeletionApproaches = [
+      // Standard approach
+      `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+      // With secure and SameSite
+      `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+        secure ? "; secure" : ""
+      }; SameSite=${effectiveSameSite}`,
+      // With max-age=0 instead of expires
+      `${name}=; path=${path}; max-age=0${
+        secure ? "; secure" : ""
+      }; SameSite=${effectiveSameSite}`,
+      // With empty value
+      `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    ];
 
-    if (secure) {
-      cookie += "; secure";
-    }
+    // Apply all basic approaches
+    basicDeletionApproaches.forEach((cookieStr) => {
+      document.cookie = cookieStr;
+    });
 
-    if (effectiveSameSite) {
-      cookie += `; samesite=${effectiveSameSite}`;
-    }
+    // If tryAllMethods is true, try more aggressive approaches
+    if (tryAllMethods) {
+      // Try with different paths
+      ["/", "", "*"].forEach((pathValue) => {
+        document.cookie = `${name}=; path=${pathValue}; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+          secure ? "; secure" : ""
+        }; SameSite=${effectiveSameSite}`;
+      });
 
-    document.cookie = cookie;
+      // Try with explicit domain and various subdomains
+      if (domainParts.length >= 2) {
+        // Try with the specific domain provided
+        if (domain) {
+          document.cookie = `${name}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+            secure ? "; secure" : ""
+          }; SameSite=${effectiveSameSite}`;
+        }
 
-    // 3. Hapus dengan domain jika ditentukan
-    if (domain) {
-      document.cookie = `${name}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        // Try with the current domain
+        document.cookie = `${name}=; path=/; domain=${hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+          secure ? "; secure" : ""
+        }; SameSite=${effectiveSameSite}`;
 
-      // Juga coba dengan secure dan samesite
-      let domainCookie = `${name}=; path=${path}; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-
-      if (secure) {
-        domainCookie += "; secure";
+        // Try with root domain (example.com)
+        if (domainParts.length > 2) {
+          const rootDomain = domainParts.slice(-2).join(".");
+          document.cookie = `${name}=; path=/; domain=.${rootDomain}; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+            secure ? "; secure" : ""
+          }; SameSite=${effectiveSameSite}`;
+        }
       }
 
-      if (effectiveSameSite) {
-        domainCookie += `; samesite=${effectiveSameSite}`;
-      }
-
-      document.cookie = domainCookie;
+      // Try with different SameSite values
+      ["none", "lax", "strict"].forEach((sameSiteValue) => {
+        if (sameSiteValue === "none" && !secure) return; // Skip none without secure
+        document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT${
+          secure ? "; secure" : ""
+        }; SameSite=${sameSiteValue}`;
+      });
     }
 
-    // 4. Coba juga dengan root path
-    if (path !== "/") {
-      document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-    }
+    console.log(`Cookie deletion attempts completed for: ${name}`);
 
-    console.log(`Cookie dihapus: ${name}`);
-
-    // Verifikasi apakah cookie benar-benar dihapus
+    // Verify if the cookie was actually deleted
     setTimeout(() => {
       const cookieExists = document.cookie
         .split("; ")
         .some((c) => c.startsWith(`${name}=`));
+
       if (cookieExists) {
-        console.warn(`Cookie ${name} masih ada setelah upaya penghapusan`);
+        console.warn(`⚠️ Cookie ${name} still exists after deletion attempts`);
+        // If cookie still exists and we haven't tried all methods, try again with all methods
+        if (!tryAllMethods) {
+          console.log(`Trying again with all deletion methods for ${name}`);
+          deleteCookie(name, { ...options, tryAllMethods: true });
+        }
       } else {
-        console.log(`Verifikasi: Cookie ${name} berhasil dihapus`);
+        console.log(`✅ Verified: Cookie ${name} successfully deleted`);
       }
     }, 50);
   } catch (error) {
-    console.error(`Error saat menghapus cookie ${name}:`, error);
+    console.error(`Error deleting cookie ${name}:`, error);
+
+    // Fallback to basic approach if an error occurs
+    try {
+      document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      console.log(`Fallback cookie deletion attempted for: ${name}`);
+    } catch (fallbackError) {
+      console.error(
+        `Fallback cookie deletion failed for ${name}:`,
+        fallbackError
+      );
+    }
   }
 }
 
