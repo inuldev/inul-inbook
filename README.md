@@ -289,6 +289,7 @@ The application has different behaviors based on the environment:
 - **Optimistic UI**: Immediate feedback for user actions with background synchronization
 - **WebP Support**: Modern image format for better performance and quality
 - **Next.js Image Component**: Optimized image loading and rendering
+- **Post Privacy Controls**: Granular privacy settings (public, friends, private) with visual indicators
 
 ### Backend Features
 

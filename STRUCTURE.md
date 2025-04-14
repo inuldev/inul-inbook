@@ -194,6 +194,7 @@ backend/
 - **CRUD Post**: Implementasi di `postController.js`
 - **Interaksi Post**: Like, comment, share di `postController.js`
 - **Media Post**: Upload dan manajemen media di `upload.js` dan `postController.js`
+- **Privasi Post**: Implementasi tipe privasi (public, friends, private) di `postController.js` dan `auth.js`
 
 ### 3. Manajemen Story
 
@@ -218,3 +219,57 @@ backend/
 - **Permintaan Pertemanan**: Implementasi di `friendController.js`
 - **Teman Bersama**: Implementasi di `friendController.js`
 - **Saran Teman**: Implementasi di `friendController.js`
+
+### 7. Privasi Post
+
+Aplikasi mendukung tiga tingkat privasi post:
+
+1. **Public**: Post dapat dilihat oleh semua pengguna, bahkan yang tidak login.
+2. **Friends**: Post hanya dapat dilihat oleh pengguna yang memiliki hubungan following/follower dengan pembuat post.
+3. **Private**: Post hanya dapat dilihat oleh pembuat post.
+
+#### Implementasi Backend
+
+Privasi post diimplementasikan di backend melalui beberapa komponen:
+
+1. **Middleware Autentikasi (`auth.js`)**:
+
+   - Middleware ini memungkinkan rute untuk menangani pengguna yang tidak login dengan lebih baik.
+   - Ketika token tidak ditemukan, middleware melanjutkan eksekusi dengan `next()` tanpa mengembalikan error 401.
+   - Ini memungkinkan rute untuk memeriksa apakah pengguna sudah login dan menyesuaikan respons berdasarkan status login.
+
+2. **Rute Post (`postRoutes.js`)**:
+
+   - Rute publik menggunakan middleware `protect` untuk autentikasi opsional.
+   - Ini memungkinkan rute untuk memeriksa apakah pengguna sudah login tanpa memblokir akses untuk pengguna yang tidak login.
+
+3. **Controller Post (`postController.js`)**:
+   - Fungsi `getPosts` memeriksa status login pengguna dan menyesuaikan query untuk mengambil post yang sesuai.
+   - Pengguna yang tidak login hanya melihat post dengan tipe "public".
+   - Pengguna yang sudah login melihat post mereka sendiri (terlepas dari tipe privasi), post "public" dari semua pengguna, dan post "friends" dari pengguna yang memiliki hubungan following/follower dengan mereka.
+   - Fungsi `getPost` memeriksa privasi post dan mengembalikan error 403 jika pengguna tidak memiliki akses.
+   - Fungsi `getUserPosts` memeriksa hubungan antara pengguna yang melihat dan pemilik post untuk menentukan post mana yang dapat dilihat.
+
+#### Implementasi Frontend
+
+Privasi post diimplementasikan di frontend melalui beberapa komponen:
+
+1. **Store Post (`postStore.js`)**:
+
+   - Store ini mengelola state post dan mengambil post dari backend.
+   - Fungsi `fetchPosts` selalu menyertakan kredensial untuk memastikan status login dikirim ke backend.
+   - Store ini juga menangani caching post untuk meningkatkan performa.
+
+2. **Komponen Post Form (`NewPostForm.jsx` dan `EditPostForm.jsx`)**:
+
+   - Komponen ini memungkinkan pengguna untuk memilih tipe privasi saat membuat atau mengedit post.
+   - Dropdown privasi menampilkan ikon dan deskripsi yang jelas untuk setiap tipe privasi.
+
+3. **Komponen Card (`BaseCard.jsx`)**:
+
+   - Komponen ini menampilkan indikator privasi di header post.
+   - Indikator privasi menampilkan ikon yang sesuai dengan tipe privasi post.
+
+4. **Komponen Privasi (`PrivacyIndicator.jsx`)**:
+   - Komponen ini menampilkan ikon dan tooltip yang menjelaskan tipe privasi post.
+   - Tooltip memberikan deskripsi lengkap tentang siapa yang dapat melihat post.

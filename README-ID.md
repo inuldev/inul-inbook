@@ -289,6 +289,7 @@ Aplikasi memiliki perilaku berbeda berdasarkan lingkungan:
 - **UI Optimistik**: Umpan balik langsung untuk tindakan pengguna dengan sinkronisasi latar belakang
 - **Dukungan WebP**: Format gambar modern untuk performa dan kualitas lebih baik
 - **Komponen Image Next.js**: Loading dan rendering gambar yang dioptimalkan
+- **Kontrol Privasi Post**: Pengaturan privasi yang detail (public, friends, private) dengan indikator visual
 
 ### Fitur Backend
 
